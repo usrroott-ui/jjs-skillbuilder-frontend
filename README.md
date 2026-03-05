@@ -10,6 +10,7 @@ Static UI for JJS Skillbuilder.
 - Editor changes are auto-saved to backend (shared for all users), not only localStorage.
 - Canvas editor supports image and video elements (video upload up to 200 MB via backend).
 - For durable video links on Render Free, backend should use `VIDEO_STORAGE_PROVIDER=github_release`.
+- Inline editor has `Migrate all videos to GitHub` action for moving old `/uploads` files.
 
 ## Local run
 

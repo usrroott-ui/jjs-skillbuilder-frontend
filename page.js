@@ -1154,6 +1154,9 @@
                     <button type="button" data-editor-save-backend>Save data to backend</button>
                     <button type="button" data-editor-logout>Logout session</button>
                 </div>
+                <div class="site-editor-row">
+                    <button type="button" data-editor-migrate-videos>Migrate all videos to GitHub</button>
+                </div>
             </div>
             <div class="site-editor-group">
                 <p class="site-editor-group-title">Icon List Actions</p>
@@ -1393,6 +1396,10 @@
 
         q("[data-editor-save-backend]").addEventListener("click", async () => {
             await saveToBackend();
+        });
+
+        q("[data-editor-migrate-videos]").addEventListener("click", async () => {
+            await migrateVideosToGitHub();
         });
 
         q("[data-editor-logout]").addEventListener("click", async () => {
@@ -1977,6 +1984,46 @@
             if (!silent) {
                 setEditorStatus(`Save failed: ${String(error?.message || error)}`, true);
             }
+            return false;
+        }
+    };
+
+    const migrateVideosToGitHub = async () => {
+        const ok = await requestEditorAccess(true);
+        if (!ok) {
+            setEditorStatus("Migration canceled: editor access denied.", true);
+            return false;
+        }
+
+        setEditorStatus("Migrating videos to GitHub storage...");
+        try {
+            const response = await apiFetch("/api/editor/migrate-videos-to-github", {
+                method: "POST",
+                body: JSON.stringify({
+                    deleteLocalFiles: true
+                })
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok || !payload?.ok) {
+                setEditorStatus(`Migration failed: ${payload?.error || `HTTP ${response.status}`}`, true);
+                return false;
+            }
+
+            const remote = await fetchPublicData();
+            if (remote) {
+                state.data = normalizeData(remote);
+                ensureCurrentSlug();
+                saveLocalData();
+                renderMain({ rebuildIcons: true, syncEditor: true });
+            }
+
+            setEditorStatus(
+                `Migrated ${Number(payload.migratedFiles || 0)} files, replaced ${Number(payload.replaced || 0)} video links.`
+            );
+            return true;
+        } catch (error) {
+            setEditorStatus(`Migration failed: ${String(error?.message || error)}`, true);
             return false;
         }
     };
