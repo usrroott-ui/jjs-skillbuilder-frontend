@@ -1870,6 +1870,8 @@
     };
 
     const disableEditor = () => {
+        const shouldSyncOnClose = state.editor.hasUnsavedChanges;
+
         state.editor.enabled = false;
         state.editor.placeMode = null;
         state.editor.drag = null;
@@ -1880,6 +1882,10 @@
         }
 
         renderMain();
+
+        if (shouldSyncOnClose) {
+            void saveToBackend({ silent: true, requireEnabled: false });
+        }
     };
 
     const isMixedContentBlocked = (apiBase) => (
