@@ -2428,8 +2428,8 @@
                 const payload = JSON.parse(event.data);
                 if (!payload?.ok || !payload?.data) return;
 
-                if (state.editor.enabled) {
-                    if (state.editor.hasUnsavedChanges) {
+                if (state.editor.hasUnsavedChanges) {
+                    if (state.editor.enabled) {
                         const now = Date.now();
                         if (now - state.editor.remoteSkipNoticeAt > 4000) {
                             setEditorStatus("Remote update skipped while editing unsaved changes.");
