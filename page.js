@@ -1511,6 +1511,7 @@
                     return;
                 }
 
+                state.editor.placeMode = null;
                 const pos = getVisibleCanvasPlacement(prepared.width, prepared.height);
                 addVideoElement(prepared.src, pos.x, pos.y, prepared.width, prepared.height);
                 setEditorStatus(`Video added (${prepared.name}). Drag it to move.`);
@@ -1888,19 +1889,6 @@
                 );
                 state.editor.placeMode = null;
                 setEditorStatus("Image placed.");
-                return;
-            }
-
-            if (state.editor.placeMode?.type === "video") {
-                addVideoElement(
-                    state.editor.placeMode.src,
-                    point.x,
-                    point.y,
-                    state.editor.placeMode.width,
-                    state.editor.placeMode.height
-                );
-                state.editor.placeMode = null;
-                setEditorStatus("Video placed.");
                 return;
             }
 
