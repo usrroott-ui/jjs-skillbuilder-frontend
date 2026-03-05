@@ -1,5 +1,5 @@
 name: Deploy Frontend to GitHub Pages
-
+# auto-deploy on push to main
 on:
   push:
     branches: ["main"]
