@@ -12,8 +12,25 @@
             return "";
         }
 
+        let candidate = value;
+
+        if (/^\d{2,5}$/.test(candidate)) {
+            candidate = `http://localhost:${candidate}`;
+        } else if (!/^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(candidate)) {
+            if (candidate.startsWith("//")) {
+                candidate = `${window.location.protocol}${candidate}`;
+            } else if (candidate.startsWith("/")) {
+                candidate = `${window.location.origin}${candidate}`;
+            } else {
+                candidate = `http://${candidate}`;
+            }
+        }
+
         try {
-            const url = new URL(value);
+            const url = new URL(candidate);
+            if (url.protocol !== "http:" && url.protocol !== "https:") {
+                return "";
+            }
             return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
         } catch (_error) {
             return "";
@@ -39,10 +56,14 @@
     const resolveApiBase = () => {
         const stored = normalizeApiBase(localStorage.getItem(BACKEND_URL_STORAGE_KEY));
         if (stored) {
+            localStorage.setItem(BACKEND_URL_STORAGE_KEY, stored);
             return stored;
         }
 
         const entered = window.prompt("Backend URL for editor:", DEFAULT_BACKEND_URL);
+        if (entered === null) {
+            return null;
+        }
         const normalized = normalizeApiBase(entered);
         if (!normalized) {
             return "";
@@ -65,6 +86,10 @@
 
         try {
             const apiBase = resolveApiBase();
+            if (apiBase === null) {
+                return;
+            }
+
             if (!apiBase) {
                 alert("Editor login canceled: backend URL is empty or invalid.");
                 return;

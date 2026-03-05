@@ -9,9 +9,40 @@ const MAX_LONG_TEXT = 131072;
 const MAX_PATH_TEXT = 8192;
 
 const params = new URLSearchParams(window.location.search);
-const apiParam = params.get("api");
-const apiStored = localStorage.getItem(BACKEND_URL_STORAGE_KEY);
-const API_BASE = String(apiParam || apiStored || "http://localhost:3000").replace(/\/+$/, "");
+const normalizeApiBase = (raw) => {
+    const value = String(raw || "").trim();
+    if (!value) {
+        return "";
+    }
+
+    let candidate = value;
+
+    if (/^\d{2,5}$/.test(candidate)) {
+        candidate = `http://localhost:${candidate}`;
+    } else if (!/^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(candidate)) {
+        if (candidate.startsWith("//")) {
+            candidate = `${window.location.protocol}${candidate}`;
+        } else if (candidate.startsWith("/")) {
+            candidate = `${window.location.origin}${candidate}`;
+        } else {
+            candidate = `http://${candidate}`;
+        }
+    }
+
+    try {
+        const url = new URL(candidate);
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+            return "";
+        }
+        return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
+    } catch (_error) {
+        return "";
+    }
+};
+
+const apiParam = normalizeApiBase(params.get("api"));
+const apiStored = normalizeApiBase(localStorage.getItem(BACKEND_URL_STORAGE_KEY));
+const API_BASE = apiParam || apiStored || "http://localhost:3000";
 localStorage.setItem(BACKEND_URL_STORAGE_KEY, API_BASE);
 
 const DEFAULT_ICONS = [
