@@ -20,34 +20,43 @@ if (iconList) {
         if (!(node instanceof Element)) {
             return null;
         }
-        return node.closest(".icon-list img");
+        const icon = node.closest("img");
+        if (!icon) {
+            return null;
+        }
+        return iconList.contains(icon) ? icon : null;
+    };
+
+    const getFullSrc = (icon) => {
+        const full = String(icon?.dataset?.full || "").trim();
+        if (full) {
+            return full;
+        }
+        return String(icon?.getAttribute("src") || "").trim();
+    };
+
+    const clearTimer = (timerRefSetter, timerValue) => {
+        if (timerValue !== null) {
+            clearTimeout(timerValue);
+            timerRefSetter(null);
+        }
     };
 
     const cancelHide = () => {
-        if (hideTimer !== null) {
-            clearTimeout(hideTimer);
-            hideTimer = null;
-        }
+        clearTimer((value) => { hideTimer = value; }, hideTimer);
     };
 
     const cancelActivate = () => {
-        if (activateTimer !== null) {
-            clearTimeout(activateTimer);
-            activateTimer = null;
-        }
+        clearTimer((value) => { activateTimer = value; }, activateTimer);
         activateTarget = null;
     };
 
     const cancelMiniHide = () => {
-        if (miniHideTimer !== null) {
-            clearTimeout(miniHideTimer);
-            miniHideTimer = null;
-            miniHideTarget = null;
-        }
+        clearTimer((value) => { miniHideTimer = value; }, miniHideTimer);
+        miniHideTarget = null;
     };
 
-    const preloadIcon = (icon) => {
-        const src = String(icon?.dataset?.full || "");
+    const preloadSrc = (src) => {
         if (!src || fullImageSizes.has(src)) {
             return;
         }
@@ -70,7 +79,9 @@ if (iconList) {
     };
 
     const preloadVisibleIcons = () => {
-        iconList.querySelectorAll("img").forEach(preloadIcon);
+        iconList.querySelectorAll("img").forEach((icon) => {
+            preloadSrc(getFullSrc(icon));
+        });
     };
 
     const applyPreviewSize = (src, fallbackRect) => {
@@ -81,7 +92,6 @@ if (iconList) {
             return;
         }
 
-        // Fallback while image metadata is not cached yet.
         preview.style.width = `${fallbackRect.width}px`;
         preview.style.height = `${fallbackRect.height}px`;
     };
@@ -93,7 +103,7 @@ if (iconList) {
     };
 
     const activatePreviewForIcon = (icon, rect) => {
-        const fullSrc = String(icon.dataset.full || "");
+        const fullSrc = getFullSrc(icon);
         if (!fullSrc) {
             return;
         }
@@ -104,14 +114,13 @@ if (iconList) {
 
         activeIcon = icon;
         icon.classList.remove("is-hidden");
-        preloadIcon(icon);
+        preloadSrc(fullSrc);
 
         preview.src = fullSrc;
         preview.style.left = `${window.scrollX + rect.left}px`;
         preview.style.top = `${window.scrollY + rect.top}px`;
         preview.style.setProperty("--mini-width", `${rect.width}px`);
         applyPreviewSize(fullSrc, rect);
-
         preview.classList.add("is-active");
         replaySlide();
 
@@ -138,18 +147,15 @@ if (iconList) {
         }
 
         icon.classList.remove("is-hidden");
-        preloadIcon(icon);
 
         activateTarget = icon;
         activateTimer = setTimeout(() => {
             if (activateTarget !== icon) {
                 return;
             }
-
-            const rect = icon.getBoundingClientRect();
-            activatePreviewForIcon(icon, rect);
             activateTimer = null;
             activateTarget = null;
+            activatePreviewForIcon(icon, icon.getBoundingClientRect());
         }, ACTIVATE_DELAY_MS);
     };
 
@@ -206,5 +212,10 @@ if (iconList) {
         handleLeave(icon);
     });
 
+    const observer = new MutationObserver(() => {
+        preloadVisibleIcons();
+    });
+
+    observer.observe(iconList, { childList: true, subtree: true });
     preloadVisibleIcons();
 }
