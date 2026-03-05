@@ -8,6 +8,7 @@ Static UI for JJS Skillbuilder.
 - If there is no active cookie session, key prompt will appear.
 - After successful auth, inline editor panel opens directly on `index.html`.
 - Editor changes are auto-saved to backend (shared for all users), not only localStorage.
+- Canvas editor supports image and video elements (video upload up to 200 MB via backend).
 
 ## Local run
 

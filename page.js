@@ -5,6 +5,7 @@
     const DEFAULT_BACKEND_URL = "https://jjs-skillbuilder-backend.onrender.com";
     const DOUBLE_F9_MS = 700;
     const AUTOSAVE_DELAY_MS = 900;
+    const MAX_VIDEO_FILE_BYTES = 200 * 1024 * 1024;
 
     const DEFAULT_ICONS = [
         { slug: "wait", title: "Wait", mini: "minskillbuilderimg/minwait.png", full: "skillbulderimg/wait.png" },
@@ -115,15 +116,18 @@
         .join(" ") || "Untitled";
 
     const normalizeElement = (element, index) => {
-        const type = element?.type === "image" ? "image" : "text";
+        const rawType = String(element?.type || "");
+        const type = rawType === "image" || rawType === "video" ? rawType : "text";
         const radiusRaw = Number(element?.radius ?? 8);
+        const defaultW = type === "image" ? 240 : type === "video" ? 360 : 260;
+        const defaultH = type === "image" ? 150 : type === "video" ? 202 : 90;
         return {
             id: String(element?.id || `el-${index + 1}`),
             type,
             x: Number(element?.x ?? 20),
             y: Number(element?.y ?? 20),
-            w: Math.max(20, Number(element?.w ?? (type === "image" ? 240 : 260))),
-            h: Math.max(20, Number(element?.h ?? (type === "image" ? 150 : 90))),
+            w: Math.max(20, Number(element?.w ?? defaultW)),
+            h: Math.max(20, Number(element?.h ?? defaultH)),
             radius: Number.isFinite(radiusRaw) ? Math.max(0, radiusRaw) : 8,
             text: String(element?.text ?? "Text"),
             color: String(element?.color ?? "#ffffff"),
@@ -399,6 +403,13 @@
                 image.src = element.src || "";
                 image.alt = "";
                 node.appendChild(image);
+            } else if (element.type === "video") {
+                const video = document.createElement("video");
+                video.src = element.src || "";
+                video.controls = true;
+                video.preload = "metadata";
+                video.playsInline = true;
+                node.appendChild(video);
             } else {
                 node.textContent = element.text;
                 node.style.color = element.color;
@@ -669,12 +680,18 @@
             refs.elementMeta.textContent = "No selected element";
             refs.elementTextWrap.style.display = "none";
             refs.elementSrcWrap.style.display = "none";
+            if (refs.elementSrcLabel) {
+                refs.elementSrcLabel.textContent = "Media source";
+            }
             return;
         }
 
         refs.elementMeta.textContent = `Selected: ${element.id} (${element.type})`;
         refs.elementTextWrap.style.display = element.type === "text" ? "block" : "none";
-        refs.elementSrcWrap.style.display = element.type === "image" ? "block" : "none";
+        refs.elementSrcWrap.style.display = element.type === "image" || element.type === "video" ? "block" : "none";
+        if (refs.elementSrcLabel) {
+            refs.elementSrcLabel.textContent = element.type === "video" ? "Video source" : "Image source";
+        }
 
         setInputValueIfIdle(refs.elText, element.text || "");
         setInputValueIfIdle(refs.elSrc, element.src || "");
@@ -744,6 +761,19 @@
         image.src = src;
     });
 
+    const readVideoDimensions = (src) => new Promise((resolve) => {
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.onloadedmetadata = () => {
+            resolve({
+                width: video.videoWidth || 480,
+                height: video.videoHeight || 270
+            });
+        };
+        video.onerror = () => resolve({ width: 480, height: 270 });
+        video.src = src;
+    });
+
     const openImagePicker = (callback) => {
         if (!state.editor.refs?.imageInput) {
             return;
@@ -751,6 +781,57 @@
         state.editor.pendingFileAction = callback;
         state.editor.refs.imageInput.value = "";
         state.editor.refs.imageInput.click();
+    };
+
+    const openVideoPicker = (callback) => {
+        if (!state.editor.refs?.videoInput) {
+            return;
+        }
+        state.editor.pendingFileAction = callback;
+        state.editor.refs.videoInput.value = "";
+        state.editor.refs.videoInput.click();
+    };
+
+    const uploadVideoToBackend = async (file) => {
+        if (!file) {
+            return null;
+        }
+
+        if (file.size > MAX_VIDEO_FILE_BYTES) {
+            setEditorStatus("Video is too large. Maximum size is 200 MB.", true);
+            return null;
+        }
+
+        const authorized = await requestEditorAccess(false);
+        if (!authorized) {
+            setEditorStatus("Authorize editor first (F9 x2) before video upload.", true);
+            return null;
+        }
+
+        try {
+            const payload = new FormData();
+            payload.append("video", file);
+
+            const response = await apiFetch("/api/editor/upload-video", {
+                method: "POST",
+                body: payload
+            });
+            const body = await response.json().catch(() => ({}));
+
+            if (!response.ok || !body?.ok || !body?.url) {
+                setEditorStatus(`Video upload failed: ${body?.error || `HTTP ${response.status}`}`, true);
+                return null;
+            }
+
+            setEditorStatus(`Video uploaded: ${file.name}`);
+            return {
+                url: String(body.url),
+                name: file.name
+            };
+        } catch (error) {
+            setEditorStatus(`Video upload failed: ${String(error?.message || error)}`, true);
+            return null;
+        }
     };
 
     const renameCurrentIconSlug = (nextSlugRaw) => {
@@ -858,6 +939,28 @@
         const element = normalizeElement({
             id: nextElementId(page),
             type: "image",
+            x,
+            y,
+            w: width,
+            h: height,
+            src
+        }, page.elements.length);
+
+        page.elements.push(element);
+        state.editor.selectedElementId = element.id;
+        saveLocalData();
+        renderMain({ syncEditor: true });
+    };
+
+    const addVideoElement = (src, x = 20, y = 20, width = 360, height = 202) => {
+        const page = getCurrentPage();
+        if (!page) {
+            return;
+        }
+
+        const element = normalizeElement({
+            id: nextElementId(page),
+            type: "video",
             x,
             y,
             w: width,
@@ -988,6 +1091,7 @@
                 <div class="site-editor-row">
                     <button type="button" data-editor-place-text>Add text mode</button>
                     <button type="button" data-editor-place-image>Add image mode</button>
+                    <button type="button" data-editor-place-video>Add video mode</button>
                     <button type="button" data-editor-remove-element>Delete selected element</button>
                 </div>
                 <p class="site-editor-meta" data-editor-element-meta>No selected element</p>
@@ -997,7 +1101,7 @@
                     </label>
                 </div>
                 <div data-editor-element-src-wrap>
-                    <label class="site-editor-field">Image source
+                    <label class="site-editor-field"><span data-editor-element-src-label>Media source</span>
                         <input type="text" data-editor-element-src>
                     </label>
                 </div>
@@ -1057,6 +1161,24 @@
         });
         panel.appendChild(imageInput);
 
+        const videoInput = document.createElement("input");
+        videoInput.type = "file";
+        videoInput.accept = "video/*";
+        videoInput.className = "site-editor-hidden-input";
+        videoInput.addEventListener("change", async () => {
+            const file = videoInput.files?.[0];
+            videoInput.value = "";
+            if (!file || typeof state.editor.pendingFileAction !== "function") {
+                state.editor.pendingFileAction = null;
+                return;
+            }
+
+            const callback = state.editor.pendingFileAction;
+            state.editor.pendingFileAction = null;
+            callback({ file, name: file.name, size: file.size });
+        });
+        panel.appendChild(videoInput);
+
         document.body.appendChild(panel);
         state.editor.panel = panel;
 
@@ -1080,6 +1202,7 @@
             elementMeta: q("[data-editor-element-meta]"),
             elementTextWrap: q("[data-editor-element-text-wrap]"),
             elementSrcWrap: q("[data-editor-element-src-wrap]"),
+            elementSrcLabel: q("[data-editor-element-src-label]"),
             elText: q("[data-editor-element-text]"),
             elSrc: q("[data-editor-element-src]"),
             elX: q("[data-editor-el-x]"),
@@ -1090,7 +1213,8 @@
             elRadius: q("[data-editor-el-radius]"),
             elColor: q("[data-editor-el-color]"),
             elBackground: q("[data-editor-el-background]"),
-            imageInput
+            imageInput,
+            videoInput
         };
 
         q("[data-editor-close]").addEventListener("click", () => {
@@ -1335,6 +1459,25 @@
             });
         });
 
+        q("[data-editor-place-video]").addEventListener("click", () => {
+            openVideoPicker(async ({ file, name }) => {
+                const uploaded = await uploadVideoToBackend(file);
+                if (!uploaded) {
+                    return;
+                }
+
+                const dimensions = await readVideoDimensions(uploaded.url);
+                const fit = fitImageSize(dimensions.width, dimensions.height);
+                state.editor.placeMode = {
+                    type: "video",
+                    src: uploaded.url,
+                    width: fit.w,
+                    height: fit.h
+                };
+                setEditorStatus(`Click on canvas to place video (${name}).`);
+            });
+        });
+
         q("[data-editor-remove-element]").addEventListener("click", () => {
             removeSelectedElement();
             setEditorStatus("Selected element removed.");
@@ -1352,7 +1495,7 @@
 
         state.editor.refs.elSrc.addEventListener("input", () => {
             const element = getSelectedElement();
-            if (!element || element.type !== "image") {
+            if (!element || (element.type !== "image" && element.type !== "video")) {
                 return;
             }
             element.src = state.editor.refs.elSrc.value;
@@ -1503,7 +1646,8 @@
         if (state.editor.token && !headers.Authorization) {
             headers.Authorization = `Bearer ${state.editor.token}`;
         }
-        if (init.body !== undefined && !headers["Content-Type"]) {
+        const bodyIsFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
+        if (init.body !== undefined && !headers["Content-Type"] && !bodyIsFormData) {
             headers["Content-Type"] = "application/json";
         }
 
@@ -1694,6 +1838,19 @@
                 );
                 state.editor.placeMode = null;
                 setEditorStatus("Image placed.");
+                return;
+            }
+
+            if (state.editor.placeMode?.type === "video") {
+                addVideoElement(
+                    state.editor.placeMode.src,
+                    point.x,
+                    point.y,
+                    state.editor.placeMode.width,
+                    state.editor.placeMode.height
+                );
+                state.editor.placeMode = null;
+                setEditorStatus("Video placed.");
                 return;
             }
 

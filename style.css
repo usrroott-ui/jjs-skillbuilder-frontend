@@ -206,6 +206,14 @@ header h1 {
     display: block;
 }
 
+.free-item.video video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #000;
+}
+
 .full-preview {
     position: absolute;
     left: 0;
