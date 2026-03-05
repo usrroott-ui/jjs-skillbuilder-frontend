@@ -8,7 +8,8 @@
     const MAX_VIDEO_FILE_BYTES = 200 * 1024 * 1024;
     const DEFAULT_CANVAS_WIDTH = 1200;
     const DEFAULT_CANVAS_HEIGHT = 420;
-    const DEFAULT_PAGE_BOUNDARY_WIDTH = 1280;
+    const DEFAULT_PAGE_BOUNDARY_WIDTH = 1200;
+    const DEFAULT_PAGE_BOUNDARY_HEIGHT = 420;
 
     const DEFAULT_ICONS = [
         { slug: "wait", title: "Wait", mini: "minskillbuilderimg/minwait.png", full: "skillbulderimg/wait.png" },
@@ -75,7 +76,11 @@
             { heading: "Tips", body: `Extra usage tips and practical combos for ${title}.` }
         ],
         canvas: { width: DEFAULT_CANVAS_WIDTH, height: DEFAULT_CANVAS_HEIGHT, background: "#1f1f1f", radius: 12 },
-        layout: { fullWidth: false, boundaryWidth: DEFAULT_PAGE_BOUNDARY_WIDTH },
+        layout: {
+            fullWidth: false,
+            boundaryWidth: DEFAULT_PAGE_BOUNDARY_WIDTH,
+            boundaryHeight: DEFAULT_PAGE_BOUNDARY_HEIGHT
+        },
         elements: []
     });
 
@@ -141,10 +146,11 @@
     };
 
     const normalizePage = (page, fallbackTitle) => {
-        const widthRaw = Number(page?.canvas?.width ?? DEFAULT_CANVAS_WIDTH);
-        const heightRaw = Number(page?.canvas?.height ?? DEFAULT_CANVAS_HEIGHT);
         const radiusRaw = Number(page?.canvas?.radius ?? 12);
         const boundaryWidthRaw = Number(page?.layout?.boundaryWidth ?? DEFAULT_PAGE_BOUNDARY_WIDTH);
+        const boundaryHeightRaw = Number(page?.layout?.boundaryHeight ?? DEFAULT_PAGE_BOUNDARY_HEIGHT);
+        const normalizedBoundaryWidth = Math.max(320, Number.isFinite(boundaryWidthRaw) ? boundaryWidthRaw : DEFAULT_PAGE_BOUNDARY_WIDTH);
+        const normalizedBoundaryHeight = Math.max(220, Number.isFinite(boundaryHeightRaw) ? boundaryHeightRaw : DEFAULT_PAGE_BOUNDARY_HEIGHT);
 
         return {
             title: String(page?.title || fallbackTitle),
@@ -156,14 +162,15 @@
                 }))
                 : [],
             canvas: {
-                width: Math.max(320, Number.isFinite(widthRaw) ? widthRaw : DEFAULT_CANVAS_WIDTH),
-                height: Math.max(220, Number.isFinite(heightRaw) ? heightRaw : DEFAULT_CANVAS_HEIGHT),
+                width: normalizedBoundaryWidth,
+                height: normalizedBoundaryHeight,
                 background: String(page?.canvas?.background || "#1f1f1f"),
                 radius: Math.max(0, Number.isFinite(radiusRaw) ? radiusRaw : 12)
             },
             layout: {
                 fullWidth: Boolean(page?.layout?.fullWidth),
-                boundaryWidth: Math.max(900, Number.isFinite(boundaryWidthRaw) ? boundaryWidthRaw : DEFAULT_PAGE_BOUNDARY_WIDTH)
+                boundaryWidth: normalizedBoundaryWidth,
+                boundaryHeight: normalizedBoundaryHeight
             },
             elements: Array.isArray(page?.elements)
                 ? page.elements.map((item, idx) => normalizeElement(item, idx))
@@ -359,6 +366,28 @@
             element.radius = Math.max(0, Math.round(Number(element.radius || 0)));
         });
     };
+
+    const syncCanvasToPageBoundary = (page) => {
+        if (!page) {
+            return;
+        }
+
+        if (!page.layout || typeof page.layout !== "object") {
+            page.layout = {
+                fullWidth: false,
+                boundaryWidth: DEFAULT_PAGE_BOUNDARY_WIDTH,
+                boundaryHeight: DEFAULT_PAGE_BOUNDARY_HEIGHT
+            };
+        }
+
+        const boundaryWidth = Math.max(320, Math.round(Number(page.layout.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH)));
+        const boundaryHeight = Math.max(220, Math.round(Number(page.layout.boundaryHeight || DEFAULT_PAGE_BOUNDARY_HEIGHT)));
+        page.layout.boundaryWidth = boundaryWidth;
+        page.layout.boundaryHeight = boundaryHeight;
+
+        page.canvas.width = boundaryWidth;
+        page.canvas.height = boundaryHeight;
+    };
     const renderSections = (container, sections, sectionClass) => {
         if (!container) {
             return;
@@ -453,13 +482,13 @@
 
         refs.title.textContent = page.title;
         refs.subtitle.textContent = page.subtitle;
+        syncCanvasToPageBoundary(page);
+        clampElementsToCanvas(page);
         renderSections(refs.sections, page.sections, "split-section");
         if (refs.splitInner) {
             const fullWidth = Boolean(page.layout?.fullWidth);
             refs.splitInner.classList.toggle("is-full-width", fullWidth);
-            refs.splitInner.style.maxWidth = fullWidth
-                ? "none"
-                : `${Math.max(900, Number(page.layout?.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH))}px`;
+            refs.splitInner.style.maxWidth = fullWidth ? "none" : `${page.layout.boundaryWidth}px`;
         }
         refs.canvas.style.width = `${page.canvas.width}px`;
         refs.canvas.style.height = `${page.canvas.height}px`;
@@ -498,12 +527,12 @@
 
         refs.title.textContent = page.title;
         refs.subtitle.textContent = page.subtitle;
+        syncCanvasToPageBoundary(page);
+        clampElementsToCanvas(page);
         renderSections(refs.sections, page.sections, "page-section");
         if (refs.card) {
             const fullWidth = Boolean(page.layout?.fullWidth);
-            refs.card.style.maxWidth = fullWidth
-                ? "none"
-                : `${Math.max(900, Number(page.layout?.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH))}px`;
+            refs.card.style.maxWidth = fullWidth ? "none" : `${page.layout.boundaryWidth}px`;
         }
         refs.canvas.style.width = `${page.canvas.width}px`;
         refs.canvas.style.height = `${page.canvas.height}px`;
@@ -762,6 +791,10 @@
             setInputValueIfIdle(
                 refs.layoutBoundaryWidth,
                 String(Math.round(Number(page.layout?.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH)))
+            );
+            setInputValueIfIdle(
+                refs.layoutBoundaryHeight,
+                String(Math.round(Number(page.layout?.boundaryHeight || DEFAULT_PAGE_BOUNDARY_HEIGHT)))
             );
             setInputValueIfIdle(refs.pageTitle, page.title);
             setInputValueIfIdle(refs.pageSubtitle, page.subtitle);
@@ -1158,10 +1191,10 @@
             <div class="site-editor-group">
                 <p class="site-editor-group-title">Page Layout</p>
                 <div class="site-editor-grid site-editor-grid-2">
-                    <label class="site-editor-field">Canvas width (px)
+                    <label class="site-editor-field">Canvas width (auto by page X)
                         <input type="number" min="320" data-editor-canvas-width>
                     </label>
-                    <label class="site-editor-field">Canvas height (px)
+                    <label class="site-editor-field">Canvas height (auto by page Y)
                         <input type="number" min="220" data-editor-canvas-height>
                     </label>
                 </div>
@@ -1176,15 +1209,22 @@
                     Use full right panel width
                 </label>
                 <label class="site-editor-field">Page boundary width (px)
-                    <input type="number" min="900" data-editor-layout-boundary-width>
+                    <input type="number" min="320" data-editor-layout-boundary-width>
+                </label>
+                <label class="site-editor-field">Page boundary height (px)
+                    <input type="number" min="220" data-editor-layout-boundary-height>
                 </label>
                 <div class="site-editor-row">
                     <button type="button" data-editor-canvas-expand>Expand canvas (+200 px)</button>
                     <button type="button" data-editor-canvas-shrink>Shrink canvas (-200 px)</button>
                 </div>
                 <div class="site-editor-row">
-                    <button type="button" data-editor-boundary-expand>Expand page boundary (+200 px)</button>
-                    <button type="button" data-editor-boundary-shrink>Shrink page boundary (-200 px)</button>
+                    <button type="button" data-editor-boundary-expand-x>Expand page boundary X (+200 px)</button>
+                    <button type="button" data-editor-boundary-shrink-x>Shrink page boundary X (-200 px)</button>
+                </div>
+                <div class="site-editor-row">
+                    <button type="button" data-editor-boundary-expand-y>Expand page boundary Y (+120 px)</button>
+                    <button type="button" data-editor-boundary-shrink-y>Shrink page boundary Y (-120 px)</button>
                 </div>
             </div>
             <div class="site-editor-group">
@@ -1311,6 +1351,7 @@
             canvasRadius: q("[data-editor-canvas-radius]"),
             layoutFullWidth: q("[data-editor-layout-full-width]"),
             layoutBoundaryWidth: q("[data-editor-layout-boundary-width]"),
+            layoutBoundaryHeight: q("[data-editor-layout-boundary-height]"),
             pageTitle: q("[data-editor-page-title]"),
             pageSubtitle: q("[data-editor-page-subtitle]"),
             sectionsWrap: q("[data-editor-sections]"),
@@ -1453,17 +1494,24 @@
             }
 
             if (!page.layout || typeof page.layout !== "object") {
-                page.layout = { fullWidth: false, boundaryWidth: DEFAULT_PAGE_BOUNDARY_WIDTH };
+                page.layout = {
+                    fullWidth: false,
+                    boundaryWidth: DEFAULT_PAGE_BOUNDARY_WIDTH,
+                    boundaryHeight: DEFAULT_PAGE_BOUNDARY_HEIGHT
+                };
             }
             if (!Number.isFinite(Number(page.layout.boundaryWidth))) {
                 page.layout.boundaryWidth = DEFAULT_PAGE_BOUNDARY_WIDTH;
             }
+            if (!Number.isFinite(Number(page.layout.boundaryHeight))) {
+                page.layout.boundaryHeight = DEFAULT_PAGE_BOUNDARY_HEIGHT;
+            }
             page.layout.fullWidth = Boolean(page.layout.fullWidth);
             updater(page);
-            page.canvas.width = Math.max(320, Math.round(Number(page.canvas.width || DEFAULT_CANVAS_WIDTH)));
-            page.canvas.height = Math.max(220, Math.round(Number(page.canvas.height || DEFAULT_CANVAS_HEIGHT)));
             page.canvas.radius = Math.max(0, Math.round(Number(page.canvas.radius || 0)));
-            page.layout.boundaryWidth = Math.max(900, Math.round(Number(page.layout.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH)));
+            page.layout.boundaryWidth = Math.max(320, Math.round(Number(page.layout.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH)));
+            page.layout.boundaryHeight = Math.max(220, Math.round(Number(page.layout.boundaryHeight || DEFAULT_PAGE_BOUNDARY_HEIGHT)));
+            syncCanvasToPageBoundary(page);
             clampElementsToCanvas(page);
             saveLocalData();
             renderMain({ syncEditor: true });
@@ -1478,7 +1526,7 @@
                 return;
             }
             updateCanvas((page) => {
-                page.canvas.width = numeric;
+                page.layout.boundaryWidth = numeric;
             }, "Canvas width updated.");
         });
 
@@ -1488,7 +1536,7 @@
                 return;
             }
             updateCanvas((page) => {
-                page.canvas.height = numeric;
+                page.layout.boundaryHeight = numeric;
             }, "Canvas height updated.");
         });
 
@@ -1526,33 +1574,58 @@
             }, "Page boundary width updated.");
         });
 
+        state.editor.refs.layoutBoundaryHeight.addEventListener("input", () => {
+            const numeric = Number(state.editor.refs.layoutBoundaryHeight.value);
+            if (!Number.isFinite(numeric)) {
+                return;
+            }
+            updateCanvas((page) => {
+                page.layout.boundaryHeight = numeric;
+                page.layout.fullWidth = false;
+            }, "Page boundary height updated.");
+        });
+
         q("[data-editor-canvas-expand]").addEventListener("click", () => {
             updateCanvas((page) => {
-                page.canvas.width += 200;
-                page.canvas.height += 120;
+                page.layout.boundaryWidth += 200;
+                page.layout.boundaryHeight += 120;
                 page.layout.fullWidth = true;
             }, "Canvas expanded.");
         });
 
         q("[data-editor-canvas-shrink]").addEventListener("click", () => {
             updateCanvas((page) => {
-                page.canvas.width = Math.max(320, page.canvas.width - 200);
-                page.canvas.height = Math.max(220, page.canvas.height - 120);
+                page.layout.boundaryWidth = Math.max(320, page.layout.boundaryWidth - 200);
+                page.layout.boundaryHeight = Math.max(220, page.layout.boundaryHeight - 120);
             }, "Canvas size reduced.");
         });
 
-        q("[data-editor-boundary-expand]").addEventListener("click", () => {
+        q("[data-editor-boundary-expand-x]").addEventListener("click", () => {
             updateCanvas((page) => {
                 page.layout.boundaryWidth += 200;
                 page.layout.fullWidth = false;
-            }, "Page boundary expanded.");
+            }, "Page boundary X expanded.");
         });
 
-        q("[data-editor-boundary-shrink]").addEventListener("click", () => {
+        q("[data-editor-boundary-shrink-x]").addEventListener("click", () => {
             updateCanvas((page) => {
-                page.layout.boundaryWidth = Math.max(900, page.layout.boundaryWidth - 200);
+                page.layout.boundaryWidth = Math.max(320, page.layout.boundaryWidth - 200);
                 page.layout.fullWidth = false;
-            }, "Page boundary reduced.");
+            }, "Page boundary X reduced.");
+        });
+
+        q("[data-editor-boundary-expand-y]").addEventListener("click", () => {
+            updateCanvas((page) => {
+                page.layout.boundaryHeight += 120;
+                page.layout.fullWidth = false;
+            }, "Page boundary Y expanded.");
+        });
+
+        q("[data-editor-boundary-shrink-y]").addEventListener("click", () => {
+            updateCanvas((page) => {
+                page.layout.boundaryHeight = Math.max(220, page.layout.boundaryHeight - 120);
+                page.layout.fullWidth = false;
+            }, "Page boundary Y reduced.");
         });
 
         state.editor.refs.pageTitle.addEventListener("input", () => {
