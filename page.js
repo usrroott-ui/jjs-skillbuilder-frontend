@@ -2331,6 +2331,40 @@
         }
 
         initHotkey();
+        connectLiveStream();
+    };
+
+    const connectLiveStream = () => {
+        const apiBase = state.editor.apiBase;
+        if (!apiBase || isMixedContentBlocked(apiBase)) return;
+
+        const url = `${apiBase}/api/site-data/stream`;
+        const source = new EventSource(url);
+
+        source.onmessage = (event) => {
+            try {
+                const payload = JSON.parse(event.data);
+                if (!payload?.ok || !payload?.data) return;
+                const fresh = normalizeData(payload.data);
+                state.data = fresh;
+                saveLocalData();
+                ensureCurrentSlug();
+                if (isIndexPage()) {
+                    buildIconList();
+                    renderMain({ rebuildIcons: true, syncEditor: true });
+                }
+                if (isStandalonePage()) {
+                    renderStandalone();
+                }
+            } catch (_error) {
+                // ignore parse errors
+            }
+        };
+
+        source.onerror = () => {
+            source.close();
+            setTimeout(connectLiveStream, 5000);
+        };
     };
 
     bootstrap();
