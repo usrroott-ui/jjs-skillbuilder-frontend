@@ -802,9 +802,9 @@
             return null;
         }
 
-        const authorized = await requestEditorAccess(false);
+        const authorized = await requestEditorAccess(true);
         if (!authorized) {
-            setEditorStatus("Authorize editor first (F9 x2) before video upload.", true);
+            setEditorStatus("Video upload canceled: editor access denied.", true);
             return null;
         }
 
@@ -832,6 +832,27 @@
             setEditorStatus(`Video upload failed: ${String(error?.message || error)}`, true);
             return null;
         }
+    };
+
+    const prepareVideoPlacement = async (file, fallbackName = "video") => {
+        if (!file) {
+            return null;
+        }
+
+        setEditorStatus(`Uploading video: ${file.name || fallbackName} ...`);
+        const uploaded = await uploadVideoToBackend(file);
+        if (!uploaded) {
+            return null;
+        }
+
+        const dimensions = await readVideoDimensions(uploaded.url);
+        const fit = fitImageSize(dimensions.width, dimensions.height);
+        return {
+            src: uploaded.url,
+            name: uploaded.name || file.name || fallbackName,
+            width: fit.w,
+            height: fit.h
+        };
     };
 
     const renameCurrentIconSlug = (nextSlugRaw) => {
@@ -1461,22 +1482,22 @@
 
         q("[data-editor-place-video]").addEventListener("click", () => {
             openVideoPicker(async ({ file, name }) => {
-                const uploaded = await uploadVideoToBackend(file);
-                if (!uploaded) {
+                const prepared = await prepareVideoPlacement(file, name);
+                if (!prepared) {
                     return;
                 }
 
-                const dimensions = await readVideoDimensions(uploaded.url);
-                const fit = fitImageSize(dimensions.width, dimensions.height);
                 state.editor.placeMode = {
                     type: "video",
-                    src: uploaded.url,
-                    width: fit.w,
-                    height: fit.h
+                    src: prepared.src,
+                    width: prepared.width,
+                    height: prepared.height
                 };
-                setEditorStatus(`Click on canvas to place video (${name}).`);
+                setEditorStatus(`Click on canvas to place video (${prepared.name}).`);
             });
         });
+
+        q("[data-editor-place-video]").title = "Pick a video file (max 200 MB), then click canvas to place it";
 
         q("[data-editor-remove-element]").addEventListener("click", () => {
             removeSelectedElement();
@@ -1798,6 +1819,15 @@
         state.editor.canvasBound = true;
         const canvas = state.refs.index.canvas;
 
+        const getDroppedVideoFile = (event) => {
+            const files = Array.from(event.dataTransfer?.files || []);
+            if (files.length === 0) {
+                return null;
+            }
+
+            return files.find((file) => String(file.type || "").startsWith("video/")) || null;
+        };
+
         const toCanvasPosition = (event) => {
             const rect = canvas.getBoundingClientRect();
             return {
@@ -1876,6 +1906,50 @@
 
             state.editor.selectedElementId = "";
             renderMain({ syncEditor: true });
+        });
+
+        canvas.addEventListener("dragover", (event) => {
+            if (!state.editor.enabled) {
+                return;
+            }
+
+            if (!getDroppedVideoFile(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+        });
+
+        canvas.addEventListener("drop", (event) => {
+            if (!state.editor.enabled) {
+                return;
+            }
+
+            const file = getDroppedVideoFile(event);
+            if (!file) {
+                return;
+            }
+
+            event.preventDefault();
+            const point = toCanvasPosition(event);
+
+            void (async () => {
+                const prepared = await prepareVideoPlacement(file, file.name);
+                if (!prepared) {
+                    return;
+                }
+
+                const page = getCurrentPage();
+                if (!page) {
+                    return;
+                }
+
+                const x = clamp(Math.round(point.x), 0, Math.max(0, page.canvas.width - prepared.width));
+                const y = clamp(Math.round(point.y), 0, Math.max(0, page.canvas.height - prepared.height));
+                addVideoElement(prepared.src, x, y, prepared.width, prepared.height);
+                setEditorStatus(`Video added from drag-and-drop (${prepared.name}).`);
+            })();
         });
 
         document.addEventListener("mousemove", (event) => {
