@@ -68,7 +68,8 @@
             { heading: "Setup", body: `Configuration details and values for ${title}.` },
             { heading: "Tips", body: `Extra usage tips and practical combos for ${title}.` }
         ],
-        canvas: { width: 980, height: 420, background: "#1f1f1f" },
+        canvas: { width: 980, height: 420, background: "#1f1f1f", radius: 12 },
+        layout: { fullWidth: false },
         elements: []
     });
 
@@ -113,6 +114,7 @@
 
     const normalizeElement = (element, index) => {
         const type = element?.type === "image" ? "image" : "text";
+        const radiusRaw = Number(element?.radius ?? 8);
         return {
             id: String(element?.id || `el-${index + 1}`),
             type,
@@ -120,6 +122,7 @@
             y: Number(element?.y ?? 20),
             w: Math.max(20, Number(element?.w ?? (type === "image" ? 240 : 260))),
             h: Math.max(20, Number(element?.h ?? (type === "image" ? 150 : 90))),
+            radius: Number.isFinite(radiusRaw) ? Math.max(0, radiusRaw) : 8,
             text: String(element?.text ?? "Text"),
             color: String(element?.color ?? "#ffffff"),
             background: String(element?.background ?? "transparent"),
@@ -128,24 +131,34 @@
         };
     };
 
-    const normalizePage = (page, fallbackTitle) => ({
-        title: String(page?.title || fallbackTitle),
-        subtitle: String(page?.subtitle || ""),
-        sections: Array.isArray(page?.sections)
-            ? page.sections.map((section) => ({
-                heading: String(section?.heading || "Section"),
-                body: String(section?.body || "")
-            }))
-            : [],
-        canvas: {
-            width: Math.max(320, Number(page?.canvas?.width ?? 980)),
-            height: Math.max(220, Number(page?.canvas?.height ?? 420)),
-            background: String(page?.canvas?.background || "#1f1f1f")
-        },
-        elements: Array.isArray(page?.elements)
-            ? page.elements.map((item, idx) => normalizeElement(item, idx))
-            : []
-    });
+    const normalizePage = (page, fallbackTitle) => {
+        const widthRaw = Number(page?.canvas?.width ?? 980);
+        const heightRaw = Number(page?.canvas?.height ?? 420);
+        const radiusRaw = Number(page?.canvas?.radius ?? 12);
+
+        return {
+            title: String(page?.title || fallbackTitle),
+            subtitle: String(page?.subtitle || ""),
+            sections: Array.isArray(page?.sections)
+                ? page.sections.map((section) => ({
+                    heading: String(section?.heading || "Section"),
+                    body: String(section?.body || "")
+                }))
+                : [],
+            canvas: {
+                width: Math.max(320, Number.isFinite(widthRaw) ? widthRaw : 980),
+                height: Math.max(220, Number.isFinite(heightRaw) ? heightRaw : 420),
+                background: String(page?.canvas?.background || "#1f1f1f"),
+                radius: Math.max(0, Number.isFinite(radiusRaw) ? radiusRaw : 12)
+            },
+            layout: {
+                fullWidth: Boolean(page?.layout?.fullWidth)
+            },
+            elements: Array.isArray(page?.elements)
+                ? page.elements.map((item, idx) => normalizeElement(item, idx))
+                : []
+        };
+    };
 
     const normalizeData = (rawData) => {
         const defaults = makeDefaultData();
@@ -182,6 +195,7 @@
         refs: {
             index: {
                 iconList: document.getElementById("iconList") || document.querySelector(".icon-list"),
+                splitInner: document.querySelector(".split-inner"),
                 title: document.getElementById("splitTitle"),
                 subtitle: document.getElementById("splitSubtitle"),
                 sections: document.getElementById("splitSections"),
@@ -304,6 +318,20 @@
         }
         return `el-${index}`;
     };
+
+    const clampElementsToCanvas = (page) => {
+        if (!page) {
+            return;
+        }
+
+        page.elements.forEach((element) => {
+            element.w = clamp(Math.round(element.w), 20, page.canvas.width);
+            element.h = clamp(Math.round(element.h), 20, page.canvas.height);
+            element.x = clamp(Math.round(element.x), 0, Math.max(0, page.canvas.width - element.w));
+            element.y = clamp(Math.round(element.y), 0, Math.max(0, page.canvas.height - element.h));
+            element.radius = Math.max(0, Math.round(Number(element.radius || 0)));
+        });
+    };
     const renderSections = (container, sections, sectionClass) => {
         if (!container) {
             return;
@@ -340,6 +368,7 @@
             node.style.top = `${element.y}px`;
             node.style.width = `${element.w}px`;
             node.style.height = `${element.h}px`;
+            node.style.borderRadius = `${Math.max(0, Number(element.radius || 0))}px`;
 
             if (state.editor.enabled) {
                 node.classList.add("is-edit-draggable");
@@ -380,15 +409,23 @@
             refs.canvas.style.width = "980px";
             refs.canvas.style.height = "420px";
             refs.canvas.style.background = "#1f1f1f";
+            refs.canvas.style.borderRadius = "12px";
+            if (refs.splitInner) {
+                refs.splitInner.classList.remove("is-full-width");
+            }
             return;
         }
 
         refs.title.textContent = page.title;
         refs.subtitle.textContent = page.subtitle;
         renderSections(refs.sections, page.sections, "split-section");
+        if (refs.splitInner) {
+            refs.splitInner.classList.toggle("is-full-width", Boolean(page.layout?.fullWidth));
+        }
         refs.canvas.style.width = `${page.canvas.width}px`;
         refs.canvas.style.height = `${page.canvas.height}px`;
         refs.canvas.style.background = page.canvas.background;
+        refs.canvas.style.borderRadius = `${Math.max(0, Number(page.canvas.radius || 0))}px`;
         renderElements(refs.canvas, page);
 
         state.indexLinks.forEach((link) => {
@@ -413,6 +450,7 @@
             refs.canvas.style.width = "980px";
             refs.canvas.style.height = "420px";
             refs.canvas.style.background = "#1f1f1f";
+            refs.canvas.style.borderRadius = "12px";
             return;
         }
 
@@ -422,6 +460,7 @@
         refs.canvas.style.width = `${page.canvas.width}px`;
         refs.canvas.style.height = `${page.canvas.height}px`;
         refs.canvas.style.background = page.canvas.background;
+        refs.canvas.style.borderRadius = `${Math.max(0, Number(page.canvas.radius || 0))}px`;
         renderElements(refs.canvas, page);
         document.title = `${page.title} | JJS Skillbuilder`;
     };
@@ -573,6 +612,7 @@
         setInputValueIfIdle(refs.elW, String(Math.round(element.w)));
         setInputValueIfIdle(refs.elH, String(Math.round(element.h)));
         setInputValueIfIdle(refs.elFontSize, String(Math.round(element.fontSize || 20)));
+        setInputValueIfIdle(refs.elRadius, String(Math.round(element.radius || 0)));
         setInputValueIfIdle(refs.elColor, element.color || "#ffffff");
         setInputValueIfIdle(refs.elBackground, element.background || "transparent");
     };
@@ -604,6 +644,13 @@
         }
 
         if (page) {
+            setInputValueIfIdle(refs.canvasWidth, String(Math.round(page.canvas.width || 980)));
+            setInputValueIfIdle(refs.canvasHeight, String(Math.round(page.canvas.height || 420)));
+            setInputValueIfIdle(refs.canvasBackground, page.canvas.background || "#1f1f1f");
+            setInputValueIfIdle(refs.canvasRadius, String(Math.round(page.canvas.radius || 0)));
+            if (document.activeElement !== refs.layoutFullWidth) {
+                refs.layoutFullWidth.checked = Boolean(page.layout?.fullWidth);
+            }
             setInputValueIfIdle(refs.pageTitle, page.title);
             setInputValueIfIdle(refs.pageSubtitle, page.subtitle);
         }
@@ -784,72 +831,132 @@
             </div>
             <p class="site-editor-status" data-editor-status>Editor ready.</p>
             <div class="site-editor-group">
-                <label>Backend URL</label>
-                <input type="text" data-editor-api>
+                <p class="site-editor-group-title">Connection</p>
+                <label class="site-editor-field">Backend URL
+                    <input type="text" data-editor-api>
+                </label>
                 <div class="site-editor-row">
-                    <button type="button" data-editor-connect>Connect</button>
-                    <button type="button" data-editor-save-backend>Save</button>
-                    <button type="button" data-editor-logout>Logout</button>
+                    <button type="button" data-editor-connect>Connect to backend</button>
+                    <button type="button" data-editor-save-backend>Save data to backend</button>
+                    <button type="button" data-editor-logout>Logout session</button>
                 </div>
             </div>
             <div class="site-editor-group">
-                <label>Current Icon</label>
-                <select data-editor-icon-select></select>
+                <p class="site-editor-group-title">Icon List Actions</p>
+                <label class="site-editor-field">Current icon
+                    <select data-editor-icon-select></select>
+                </label>
                 <div class="site-editor-row">
-                    <button type="button" data-editor-icon-add>Add</button>
-                    <button type="button" data-editor-icon-up>Up</button>
-                    <button type="button" data-editor-icon-down>Down</button>
-                    <button type="button" data-editor-icon-remove>Remove</button>
+                    <button type="button" data-editor-icon-add>Add icon</button>
+                    <button type="button" data-editor-icon-up>Move icon up</button>
+                    <button type="button" data-editor-icon-down>Move icon down</button>
+                    <button type="button" data-editor-icon-remove>Delete icon</button>
                 </div>
-                <input type="text" placeholder="Icon title" data-editor-icon-title>
+                <label class="site-editor-field">Icon title
+                    <input type="text" data-editor-icon-title>
+                </label>
                 <div class="site-editor-row">
-                    <input type="text" placeholder="Icon slug" data-editor-icon-slug>
-                    <button type="button" data-editor-icon-apply-slug>Apply</button>
+                    <label class="site-editor-field">Icon slug
+                        <input type="text" data-editor-icon-slug>
+                    </label>
+                    <button type="button" data-editor-icon-apply-slug>Apply new slug</button>
                 </div>
                 <div class="site-editor-row">
-                    <input type="text" placeholder="Mini icon src" data-editor-icon-mini>
-                    <button type="button" data-editor-upload-mini>Upload</button>
+                    <label class="site-editor-field">Mini icon source
+                        <input type="text" data-editor-icon-mini>
+                    </label>
+                    <button type="button" data-editor-upload-mini>Upload mini icon</button>
                 </div>
                 <div class="site-editor-row">
-                    <input type="text" placeholder="Full icon src" data-editor-icon-full>
-                    <button type="button" data-editor-upload-full>Upload</button>
+                    <label class="site-editor-field">Full icon source
+                        <input type="text" data-editor-icon-full>
+                    </label>
+                    <button type="button" data-editor-upload-full>Upload full icon</button>
                 </div>
             </div>
             <div class="site-editor-group">
-                <label>Page Title</label>
-                <input type="text" data-editor-page-title>
-                <label>Subtitle</label>
-                <textarea rows="3" data-editor-page-subtitle></textarea>
+                <p class="site-editor-group-title">Page Layout</p>
+                <div class="site-editor-grid site-editor-grid-2">
+                    <label class="site-editor-field">Canvas width (px)
+                        <input type="number" min="320" data-editor-canvas-width>
+                    </label>
+                    <label class="site-editor-field">Canvas height (px)
+                        <input type="number" min="220" data-editor-canvas-height>
+                    </label>
+                </div>
+                <label class="site-editor-field">Canvas background
+                    <input type="text" data-editor-canvas-background>
+                </label>
+                <label class="site-editor-field">Canvas corner radius (px)
+                    <input type="number" min="0" data-editor-canvas-radius>
+                </label>
+                <label class="site-editor-toggle">
+                    <input type="checkbox" data-editor-layout-full-width>
+                    Use full right panel width
+                </label>
                 <div class="site-editor-row">
-                    <button type="button" data-editor-add-section>Add section</button>
+                    <button type="button" data-editor-canvas-expand>Expand canvas (+200 px)</button>
+                    <button type="button" data-editor-canvas-shrink>Shrink canvas (-200 px)</button>
+                </div>
+            </div>
+            <div class="site-editor-group">
+                <p class="site-editor-group-title">Page Content</p>
+                <label class="site-editor-field">Page title
+                    <input type="text" data-editor-page-title>
+                </label>
+                <label class="site-editor-field">Page subtitle
+                    <textarea rows="3" data-editor-page-subtitle></textarea>
+                </label>
+                <div class="site-editor-row">
+                    <button type="button" data-editor-add-section>Add section block</button>
                 </div>
                 <div data-editor-sections></div>
             </div>
             <div class="site-editor-group">
+                <p class="site-editor-group-title">Canvas Element Actions</p>
                 <div class="site-editor-row">
-                    <button type="button" data-editor-place-text>Place text</button>
-                    <button type="button" data-editor-place-image>Place image</button>
-                    <button type="button" data-editor-remove-element>Remove element</button>
+                    <button type="button" data-editor-place-text>Add text mode</button>
+                    <button type="button" data-editor-place-image>Add image mode</button>
+                    <button type="button" data-editor-remove-element>Delete selected element</button>
                 </div>
                 <p class="site-editor-meta" data-editor-element-meta>No selected element</p>
                 <div data-editor-element-text-wrap>
-                    <label>Text</label>
-                    <textarea rows="3" data-editor-element-text></textarea>
+                    <label class="site-editor-field">Text content
+                        <textarea rows="3" data-editor-element-text></textarea>
+                    </label>
                 </div>
                 <div data-editor-element-src-wrap>
-                    <label>Image src</label>
-                    <input type="text" data-editor-element-src>
+                    <label class="site-editor-field">Image source
+                        <input type="text" data-editor-element-src>
+                    </label>
                 </div>
-                <div class="site-editor-grid">
-                    <input type="number" placeholder="x" data-editor-el-x>
-                    <input type="number" placeholder="y" data-editor-el-y>
-                    <input type="number" placeholder="w" data-editor-el-w>
-                    <input type="number" placeholder="h" data-editor-el-h>
+                <div class="site-editor-grid site-editor-grid-2">
+                    <label class="site-editor-field">X
+                        <input type="number" data-editor-el-x>
+                    </label>
+                    <label class="site-editor-field">Y
+                        <input type="number" data-editor-el-y>
+                    </label>
+                    <label class="site-editor-field">Width
+                        <input type="number" data-editor-el-w>
+                    </label>
+                    <label class="site-editor-field">Height
+                        <input type="number" data-editor-el-h>
+                    </label>
                 </div>
-                <div class="site-editor-grid">
-                    <input type="number" placeholder="font" data-editor-el-font-size>
-                    <input type="text" placeholder="color" data-editor-el-color>
-                    <input type="text" placeholder="background" data-editor-el-background>
+                <div class="site-editor-grid site-editor-grid-2">
+                    <label class="site-editor-field">Font size
+                        <input type="number" data-editor-el-font-size>
+                    </label>
+                    <label class="site-editor-field">Corner radius
+                        <input type="number" min="0" data-editor-el-radius>
+                    </label>
+                    <label class="site-editor-field">Text color
+                        <input type="text" data-editor-el-color>
+                    </label>
+                    <label class="site-editor-field">Background color
+                        <input type="text" data-editor-el-background>
+                    </label>
                 </div>
             </div>
         `;
@@ -891,6 +998,11 @@
             iconSlug: q("[data-editor-icon-slug]"),
             iconMini: q("[data-editor-icon-mini]"),
             iconFull: q("[data-editor-icon-full]"),
+            canvasWidth: q("[data-editor-canvas-width]"),
+            canvasHeight: q("[data-editor-canvas-height]"),
+            canvasBackground: q("[data-editor-canvas-background]"),
+            canvasRadius: q("[data-editor-canvas-radius]"),
+            layoutFullWidth: q("[data-editor-layout-full-width]"),
             pageTitle: q("[data-editor-page-title]"),
             pageSubtitle: q("[data-editor-page-subtitle]"),
             sectionsWrap: q("[data-editor-sections]"),
@@ -904,6 +1016,7 @@
             elW: q("[data-editor-el-w]"),
             elH: q("[data-editor-el-h]"),
             elFontSize: q("[data-editor-el-font-size]"),
+            elRadius: q("[data-editor-el-radius]"),
             elColor: q("[data-editor-el-color]"),
             elBackground: q("[data-editor-el-background]"),
             imageInput
@@ -946,9 +1059,17 @@
             setEditorStatus("Icon added.");
         });
 
-        q("[data-editor-icon-up]").addEventListener("click", () => moveCurrentIcon(-1));
-        q("[data-editor-icon-down]").addEventListener("click", () => moveCurrentIcon(1));
-        q("[data-editor-icon-remove]").addEventListener("click", () => removeCurrentIcon());
+        q("[data-editor-icon-up]").addEventListener("click", () => {
+            moveCurrentIcon(-1);
+            setEditorStatus("Icon moved up.");
+        });
+        q("[data-editor-icon-down]").addEventListener("click", () => {
+            moveCurrentIcon(1);
+            setEditorStatus("Icon moved down.");
+        });
+        q("[data-editor-icon-remove]").addEventListener("click", () => {
+            removeCurrentIcon();
+        });
 
         state.editor.refs.iconTitle.addEventListener("input", () => {
             const icon = state.data.icons.find((entry) => entry.slug === state.currentSlug);
@@ -1015,6 +1136,85 @@
             });
         });
 
+        const updateCanvas = (updater, statusMessage = "") => {
+            const page = getCurrentPage();
+            if (!page) {
+                return;
+            }
+
+            if (!page.layout || typeof page.layout !== "object") {
+                page.layout = { fullWidth: false };
+            }
+            updater(page);
+            page.canvas.width = Math.max(320, Math.round(Number(page.canvas.width || 980)));
+            page.canvas.height = Math.max(220, Math.round(Number(page.canvas.height || 420)));
+            page.canvas.radius = Math.max(0, Math.round(Number(page.canvas.radius || 0)));
+            clampElementsToCanvas(page);
+            saveLocalData();
+            renderMain({ syncEditor: true });
+            if (statusMessage) {
+                setEditorStatus(statusMessage);
+            }
+        };
+
+        state.editor.refs.canvasWidth.addEventListener("input", () => {
+            const numeric = Number(state.editor.refs.canvasWidth.value);
+            if (!Number.isFinite(numeric)) {
+                return;
+            }
+            updateCanvas((page) => {
+                page.canvas.width = numeric;
+            }, "Canvas width updated.");
+        });
+
+        state.editor.refs.canvasHeight.addEventListener("input", () => {
+            const numeric = Number(state.editor.refs.canvasHeight.value);
+            if (!Number.isFinite(numeric)) {
+                return;
+            }
+            updateCanvas((page) => {
+                page.canvas.height = numeric;
+            }, "Canvas height updated.");
+        });
+
+        state.editor.refs.canvasRadius.addEventListener("input", () => {
+            const numeric = Number(state.editor.refs.canvasRadius.value);
+            if (!Number.isFinite(numeric)) {
+                return;
+            }
+            updateCanvas((page) => {
+                page.canvas.radius = numeric;
+            }, "Canvas corner radius updated.");
+        });
+
+        state.editor.refs.canvasBackground.addEventListener("input", () => {
+            const value = state.editor.refs.canvasBackground.value;
+            updateCanvas((page) => {
+                page.canvas.background = value || "#1f1f1f";
+            }, "Canvas background updated.");
+        });
+
+        state.editor.refs.layoutFullWidth.addEventListener("change", () => {
+            updateCanvas((page) => {
+                page.layout.fullWidth = Boolean(state.editor.refs.layoutFullWidth.checked);
+            }, "Page width mode updated.");
+        });
+
+        q("[data-editor-canvas-expand]").addEventListener("click", () => {
+            updateCanvas((page) => {
+                page.canvas.width += 200;
+                page.canvas.height += 120;
+                page.layout.fullWidth = true;
+            }, "Canvas expanded.");
+        });
+
+        q("[data-editor-canvas-shrink]").addEventListener("click", () => {
+            updateCanvas((page) => {
+                page.canvas.width = Math.max(320, page.canvas.width - 200);
+                page.canvas.height = Math.max(220, page.canvas.height - 120);
+            }, "Canvas size reduced.");
+        });
+
         state.editor.refs.pageTitle.addEventListener("input", () => {
             const page = getCurrentPage();
             if (!page) {
@@ -1043,6 +1243,7 @@
             page.sections.push({ heading: "New section", body: "Section text" });
             saveLocalData();
             renderMain({ syncEditor: true });
+            setEditorStatus("Section added.");
         });
 
         q("[data-editor-place-text]").addEventListener("click", () => {
@@ -1065,6 +1266,7 @@
 
         q("[data-editor-remove-element]").addEventListener("click", () => {
             removeSelectedElement();
+            setEditorStatus("Selected element removed.");
         });
 
         state.editor.refs.elText.addEventListener("input", () => {
@@ -1119,15 +1321,29 @@
         });
 
         bindNumericField(state.editor.refs.elW, (element, value) => {
-            element.w = Math.max(20, Math.round(value));
+            const page = getCurrentPage();
+            if (!page) {
+                return;
+            }
+            element.w = clamp(Math.round(value), 20, page.canvas.width);
+            element.x = clamp(Math.round(element.x), 0, Math.max(0, page.canvas.width - element.w));
         });
 
         bindNumericField(state.editor.refs.elH, (element, value) => {
-            element.h = Math.max(20, Math.round(value));
+            const page = getCurrentPage();
+            if (!page) {
+                return;
+            }
+            element.h = clamp(Math.round(value), 20, page.canvas.height);
+            element.y = clamp(Math.round(element.y), 0, Math.max(0, page.canvas.height - element.h));
         });
 
         bindNumericField(state.editor.refs.elFontSize, (element, value) => {
             element.fontSize = Math.max(10, Math.round(value));
+        });
+
+        bindNumericField(state.editor.refs.elRadius, (element, value) => {
+            element.radius = Math.max(0, Math.round(value));
         });
 
         state.editor.refs.elColor.addEventListener("input", () => {

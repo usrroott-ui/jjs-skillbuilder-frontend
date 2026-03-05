@@ -101,6 +101,7 @@ body {
 .free-canvas {
     position: relative;
     min-height: 420px;
+    overflow: hidden;
 }
 
 .free-item {
