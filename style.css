@@ -132,6 +132,7 @@ header h1 {
 .split-inner {
     max-width: 1280px;
     padding: 16px 18px;
+    overflow-x: hidden;
 }
 
 .split-inner.is-full-width {
@@ -178,7 +179,9 @@ header h1 {
     border: 1px solid #353535;
     border-radius: 12px;
     background: #1f1f1f;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
 }
 
 .free-canvas {
