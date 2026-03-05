@@ -818,6 +818,11 @@
             });
             const body = await response.json().catch(() => ({}));
 
+            if (response.status === 404) {
+                setEditorStatus("Backend is outdated: /api/editor/upload-video not found. Deploy latest backend on Render.", true);
+                return null;
+            }
+
             if (!response.ok || !body?.ok || !body?.url) {
                 setEditorStatus(`Video upload failed: ${body?.error || `HTTP ${response.status}`}`, true);
                 return null;
