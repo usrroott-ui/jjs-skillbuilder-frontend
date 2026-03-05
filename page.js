@@ -244,7 +244,9 @@
             canvasBound: false,
             lastStatusMessage: "",
             lastStatusIsError: false,
-            lastStatusAt: 0
+            lastStatusAt: 0,
+            hasUnsavedChanges: false,
+            remoteSkipNoticeAt: 0
         }
     };
 
@@ -296,6 +298,9 @@
     const saveLocalData = () => {
         try {
             localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(state.data));
+            if (state.editor.enabled) {
+                state.editor.hasUnsavedChanges = true;
+            }
             return true;
         } catch (_error) {
             return false;
@@ -2013,6 +2018,7 @@
                 return false;
             }
 
+            state.editor.hasUnsavedChanges = false;
             if (!silent) {
                 setEditorStatus("Saved to backend.");
             }
@@ -2421,6 +2427,18 @@
             try {
                 const payload = JSON.parse(event.data);
                 if (!payload?.ok || !payload?.data) return;
+
+                if (state.editor.enabled) {
+                    if (state.editor.hasUnsavedChanges) {
+                        const now = Date.now();
+                        if (now - state.editor.remoteSkipNoticeAt > 4000) {
+                            setEditorStatus("Remote update skipped while editing unsaved changes.");
+                            state.editor.remoteSkipNoticeAt = now;
+                        }
+                    }
+                    return;
+                }
+
                 const fresh = normalizeData(payload.data);
                 state.data = fresh;
                 saveLocalData();
