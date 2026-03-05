@@ -9,6 +9,7 @@ Static UI for JJS Skillbuilder.
 - After successful auth, inline editor panel opens directly on `index.html`.
 - Editor changes are auto-saved to backend (shared for all users), not only localStorage.
 - Canvas editor supports image and video elements (video upload up to 200 MB via backend).
+- For durable video links on Render Free, backend should use `VIDEO_STORAGE_PROVIDER=github_release`.
 
 ## Local run
 
