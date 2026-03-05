@@ -995,6 +995,30 @@
         renderMain({ syncEditor: true });
     };
 
+    const getVisibleCanvasPlacement = (width, height) => {
+        const page = getCurrentPage();
+        if (!page) {
+            return { x: 20, y: 20 };
+        }
+
+        const canvas = state.refs.index?.canvas;
+        const container = canvas?.parentElement;
+        if (!canvas || !container) {
+            return {
+                x: clamp(20, 0, Math.max(0, page.canvas.width - width)),
+                y: clamp(20, 0, Math.max(0, page.canvas.height - height))
+            };
+        }
+
+        const centerX = container.scrollLeft + (container.clientWidth / 2) - (width / 2);
+        const centerY = container.scrollTop + (container.clientHeight / 2) - (height / 2);
+
+        return {
+            x: clamp(Math.round(centerX), 0, Math.max(0, page.canvas.width - width)),
+            y: clamp(Math.round(centerY), 0, Math.max(0, page.canvas.height - height))
+        };
+    };
+
     const removeSelectedElement = () => {
         const page = getCurrentPage();
         if (!page) {
@@ -1112,7 +1136,7 @@
                 <div class="site-editor-row">
                     <button type="button" data-editor-place-text>Add text mode</button>
                     <button type="button" data-editor-place-image>Add image mode</button>
-                    <button type="button" data-editor-place-video>Add video mode</button>
+                    <button type="button" data-editor-place-video>Add video now</button>
                     <button type="button" data-editor-remove-element>Delete selected element</button>
                 </div>
                 <p class="site-editor-meta" data-editor-element-meta>No selected element</p>
@@ -1487,17 +1511,13 @@
                     return;
                 }
 
-                state.editor.placeMode = {
-                    type: "video",
-                    src: prepared.src,
-                    width: prepared.width,
-                    height: prepared.height
-                };
-                setEditorStatus(`Click on canvas to place video (${prepared.name}).`);
+                const pos = getVisibleCanvasPlacement(prepared.width, prepared.height);
+                addVideoElement(prepared.src, pos.x, pos.y, prepared.width, prepared.height);
+                setEditorStatus(`Video added (${prepared.name}). Drag it to move.`);
             });
         });
 
-        q("[data-editor-place-video]").title = "Pick a video file (max 200 MB), then click canvas to place it";
+        q("[data-editor-place-video]").title = "Pick a video file (max 200 MB). It will be added automatically.";
 
         q("[data-editor-remove-element]").addEventListener("click", () => {
             removeSelectedElement();
