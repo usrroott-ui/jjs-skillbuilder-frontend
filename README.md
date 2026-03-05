@@ -2,6 +2,12 @@
 
 Static UI for JJS Skillbuilder.
 
+## Editor hotkey
+
+- Press `F9` twice quickly.
+- If there is no active cookie session, key prompt will appear.
+- After successful auth, editor opens at `editor.html`.
+
 ## Local run
 
 ```bash
