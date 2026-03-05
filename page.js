@@ -1,8 +1,10 @@
 (() => {
     const LOCAL_DATA_KEY = "JJS_SKILLBUILDER_DATA";
     const BACKEND_URL_STORAGE_KEY = "JJS_BACKEND_URL";
+    const EDITOR_TOKEN_STORAGE_KEY = "JJS_EDITOR_TOKEN";
     const DEFAULT_BACKEND_URL = "https://jjs-skillbuilder-backend.onrender.com";
     const DOUBLE_F9_MS = 700;
+    const AUTOSAVE_DELAY_MS = 900;
 
     const DEFAULT_ICONS = [
         { slug: "wait", title: "Wait", mini: "minskillbuilderimg/minwait.png", full: "skillbulderimg/wait.png" },
@@ -213,6 +215,7 @@
             enabled: false,
             authorized: false,
             apiBase: normalizeApiBase(localStorage.getItem(BACKEND_URL_STORAGE_KEY)) || DEFAULT_BACKEND_URL,
+            token: String(localStorage.getItem(EDITOR_TOKEN_STORAGE_KEY) || ""),
             panel: null,
             refs: null,
             selectedElementId: "",
@@ -220,7 +223,10 @@
             placeMode: null,
             lastF9At: 0,
             pendingFileAction: null,
-            canvasBound: false
+            canvasBound: false,
+            autoSaveTimer: null,
+            autoSaveInFlight: false,
+            autoSaveQueued: false
         }
     };
 
@@ -256,10 +262,21 @@
     const saveLocalData = () => {
         try {
             localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(state.data));
+            scheduleAutoSaveIfNeeded();
             return true;
         } catch (_error) {
             return false;
         }
+    };
+
+    const setEditorToken = (token) => {
+        const normalized = String(token || "").trim();
+        state.editor.token = normalized;
+        if (normalized) {
+            localStorage.setItem(EDITOR_TOKEN_STORAGE_KEY, normalized);
+            return;
+        }
+        localStorage.removeItem(EDITOR_TOKEN_STORAGE_KEY);
     };
 
     const getSlugFromHash = () => window.location.hash.replace(/^#/, "");
@@ -524,6 +541,60 @@
         }
         state.editor.refs.status.textContent = message;
         state.editor.refs.status.classList.toggle("is-error", Boolean(isError));
+    };
+
+    const canAutoSaveToBackend = () => (
+        state.editor.enabled
+        && Boolean(state.editor.apiBase)
+        && (state.editor.authorized || Boolean(state.editor.token))
+    );
+
+    const clearAutoSaveTimer = () => {
+        if (state.editor.autoSaveTimer !== null) {
+            clearTimeout(state.editor.autoSaveTimer);
+            state.editor.autoSaveTimer = null;
+        }
+    };
+
+    const runAutoSave = async () => {
+        if (!canAutoSaveToBackend()) {
+            return;
+        }
+
+        if (state.editor.autoSaveInFlight) {
+            state.editor.autoSaveQueued = true;
+            return;
+        }
+
+        state.editor.autoSaveInFlight = true;
+        try {
+            const ok = await saveToBackend({ silent: true, requireEnabled: false });
+            if (ok) {
+                setEditorStatus("Auto-saved to backend.");
+            }
+        } finally {
+            state.editor.autoSaveInFlight = false;
+            if (state.editor.autoSaveQueued) {
+                state.editor.autoSaveQueued = false;
+                clearAutoSaveTimer();
+                state.editor.autoSaveTimer = setTimeout(() => {
+                    state.editor.autoSaveTimer = null;
+                    void runAutoSave();
+                }, AUTOSAVE_DELAY_MS);
+            }
+        }
+    };
+
+    const scheduleAutoSaveIfNeeded = () => {
+        if (!canAutoSaveToBackend()) {
+            return;
+        }
+
+        clearAutoSaveTimer();
+        state.editor.autoSaveTimer = setTimeout(() => {
+            state.editor.autoSaveTimer = null;
+            void runAutoSave();
+        }, AUTOSAVE_DELAY_MS);
     };
 
     const setInputValueIfIdle = (input, value) => {
@@ -1383,6 +1454,13 @@
     };
 
     const disableEditor = () => {
+        const hadPendingSave = state.editor.autoSaveTimer !== null || state.editor.autoSaveQueued;
+        clearAutoSaveTimer();
+        state.editor.autoSaveQueued = false;
+        if (hadPendingSave) {
+            void saveToBackend({ silent: true, requireEnabled: false });
+        }
+
         state.editor.enabled = false;
         state.editor.placeMode = null;
         state.editor.drag = null;
@@ -1422,6 +1500,9 @@
         }
 
         const headers = { ...(init.headers || {}) };
+        if (state.editor.token && !headers.Authorization) {
+            headers.Authorization = `Bearer ${state.editor.token}`;
+        }
         if (init.body !== undefined && !headers["Content-Type"]) {
             headers["Content-Type"] = "application/json";
         }
@@ -1458,12 +1539,13 @@
             const sessionPayload = await sessionResponse.json().catch(() => ({}));
             if (sessionResponse.ok && sessionPayload?.authorized) {
                 state.editor.authorized = true;
-                setEditorStatus("Authorized via cookie session.");
+                setEditorStatus("Authorized session found.");
                 return true;
             }
 
+            state.editor.authorized = false;
             if (!askForKey) {
-                state.editor.authorized = false;
+                setEditorToken("");
                 return false;
             }
 
@@ -1481,27 +1563,35 @@
             if (!authResponse.ok || !authPayload?.ok) {
                 alert(`Editor access denied: ${authPayload?.error || "Invalid key"}`);
                 state.editor.authorized = false;
+                setEditorToken("");
                 return false;
             }
 
             state.editor.authorized = true;
+            if (authPayload?.token) {
+                setEditorToken(authPayload.token);
+            }
             setEditorStatus("Authorization successful.");
             return true;
         } catch (error) {
-            alert(describeConnectionError(state.editor.apiBase, error));
+            if (askForKey) {
+                alert(describeConnectionError(state.editor.apiBase, error));
+            }
             state.editor.authorized = false;
             return false;
         }
     };
 
-    const saveToBackend = async () => {
-        if (!state.editor.enabled) {
+    const saveToBackend = async ({ silent = false, requireEnabled = true } = {}) => {
+        if (requireEnabled && !state.editor.enabled) {
             return false;
         }
 
         const ok = await requestEditorAccess(false);
         if (!ok) {
-            setEditorStatus("Not authorized. Press Connect or F9 x2.", true);
+            if (!silent) {
+                setEditorStatus("Not authorized. Press Connect or F9 x2.", true);
+            }
             return false;
         }
 
@@ -1513,15 +1603,20 @@
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                setEditorStatus(`Save failed: ${payload?.error || `HTTP ${response.status}`}`, true);
+                if (!silent) {
+                    setEditorStatus(`Save failed: ${payload?.error || `HTTP ${response.status}`}`, true);
+                }
                 return false;
             }
 
-            saveLocalData();
-            setEditorStatus("Saved to backend.");
+            if (!silent) {
+                setEditorStatus("Saved to backend.");
+            }
             return true;
         } catch (error) {
-            setEditorStatus(`Save failed: ${String(error?.message || error)}`, true);
+            if (!silent) {
+                setEditorStatus(`Save failed: ${String(error?.message || error)}`, true);
+            }
             return false;
         }
     };
@@ -1538,6 +1633,7 @@
         }
 
         state.editor.authorized = false;
+        setEditorToken("");
         setEditorStatus("Logged out.");
     };
     const findElementAt = (page, x, y) => {
@@ -1715,8 +1811,12 @@
 
     const bootstrap = async () => {
         const localData = loadLocalData();
-        const initial = normalizeData(window.SKILLBUILDER_DATA || localData || makeDefaultData());
+        const remote = await fetchPublicData();
+        const initial = normalizeData(remote || window.SKILLBUILDER_DATA || localData || makeDefaultData());
         state.data = initial;
+        if (remote) {
+            saveLocalData();
+        }
 
         const hashSlug = getSlugFromHash();
         const initialSlug = state.data.pages[hashSlug]
@@ -1741,17 +1841,6 @@
             window.addEventListener("hashchange", () => {
                 renderStandalone();
             });
-        }
-
-        const remote = await fetchPublicData();
-        if (remote) {
-            state.data = normalizeData(remote);
-            ensureCurrentSlug();
-            if (!state.data.pages[state.currentSlug]) {
-                setCurrentSlug(state.data.icons[0]?.slug || "", false);
-            }
-            saveLocalData();
-            renderMain({ rebuildIcons: true, syncEditor: true });
         }
 
         initHotkey();
