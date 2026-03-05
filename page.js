@@ -5,7 +5,6 @@
     const LANG_STORAGE_KEY = "JJS_LANG";
     const DEFAULT_BACKEND_URL = "https://jjs-skillbuilder-backend.onrender.com";
     const DOUBLE_F9_MS = 700;
-    const AUTOSAVE_DELAY_MS = 900;
     const MAX_VIDEO_FILE_BYTES = 200 * 1024 * 1024;
     const DEFAULT_CANVAS_WIDTH = 1200;
     const DEFAULT_CANVAS_HEIGHT = 420;
@@ -242,10 +241,7 @@
             placeMode: null,
             lastF9At: 0,
             pendingFileAction: null,
-            canvasBound: false,
-            autoSaveTimer: null,
-            autoSaveInFlight: false,
-            autoSaveQueued: false
+            canvasBound: false
         }
     };
 
@@ -297,7 +293,6 @@
     const saveLocalData = () => {
         try {
             localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(state.data));
-            scheduleAutoSaveIfNeeded();
             return true;
         } catch (_error) {
             return false;
@@ -619,60 +614,6 @@
         }
         state.editor.refs.status.textContent = message;
         state.editor.refs.status.classList.toggle("is-error", Boolean(isError));
-    };
-
-    const canAutoSaveToBackend = () => (
-        state.editor.enabled
-        && Boolean(state.editor.apiBase)
-        && (state.editor.authorized || Boolean(state.editor.token))
-    );
-
-    const clearAutoSaveTimer = () => {
-        if (state.editor.autoSaveTimer !== null) {
-            clearTimeout(state.editor.autoSaveTimer);
-            state.editor.autoSaveTimer = null;
-        }
-    };
-
-    const runAutoSave = async () => {
-        if (!canAutoSaveToBackend()) {
-            return;
-        }
-
-        if (state.editor.autoSaveInFlight) {
-            state.editor.autoSaveQueued = true;
-            return;
-        }
-
-        state.editor.autoSaveInFlight = true;
-        try {
-            const ok = await saveToBackend({ silent: true, requireEnabled: false });
-            if (ok) {
-                setEditorStatus("Auto-saved to backend.");
-            }
-        } finally {
-            state.editor.autoSaveInFlight = false;
-            if (state.editor.autoSaveQueued) {
-                state.editor.autoSaveQueued = false;
-                clearAutoSaveTimer();
-                state.editor.autoSaveTimer = setTimeout(() => {
-                    state.editor.autoSaveTimer = null;
-                    void runAutoSave();
-                }, AUTOSAVE_DELAY_MS);
-            }
-        }
-    };
-
-    const scheduleAutoSaveIfNeeded = () => {
-        if (!canAutoSaveToBackend()) {
-            return;
-        }
-
-        clearAutoSaveTimer();
-        state.editor.autoSaveTimer = setTimeout(() => {
-            state.editor.autoSaveTimer = null;
-            void runAutoSave();
-        }, AUTOSAVE_DELAY_MS);
     };
 
     const setInputValueIfIdle = (input, value) => {
@@ -1905,13 +1846,6 @@
     };
 
     const disableEditor = () => {
-        const hadPendingSave = state.editor.autoSaveTimer !== null || state.editor.autoSaveQueued;
-        clearAutoSaveTimer();
-        state.editor.autoSaveQueued = false;
-        if (hadPendingSave) {
-            void saveToBackend({ silent: true, requireEnabled: false });
-        }
-
         state.editor.enabled = false;
         state.editor.placeMode = null;
         state.editor.drag = null;
