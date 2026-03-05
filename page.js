@@ -1038,6 +1038,25 @@
         });
     };
 
+    const getImageFileFromClipboard = (event) => {
+        const clipboard = event.clipboardData;
+        if (!clipboard) {
+            return null;
+        }
+
+        const items = Array.from(clipboard.items || []);
+        for (const item of items) {
+            if (String(item.type || "").startsWith("image/")) {
+                const file = item.getAsFile();
+                if (file) {
+                    return file;
+                }
+            }
+        }
+
+        return null;
+    };
+
     const removeSelectedElement = () => {
         const page = getCurrentPage();
         if (!page) {
@@ -1978,6 +1997,32 @@
                 addVideoElement(prepared.src, x, y, prepared.width, prepared.height);
                 revealCanvasArea();
                 setEditorStatus(`Video added from drag-and-drop (${prepared.name}).`);
+            })();
+        });
+
+        document.addEventListener("paste", (event) => {
+            if (!state.editor.enabled) {
+                return;
+            }
+
+            const imageFile = getImageFileFromClipboard(event);
+            if (!imageFile) {
+                return;
+            }
+
+            event.preventDefault();
+            void (async () => {
+                try {
+                    const src = await readFileAsDataUrl(imageFile);
+                    const dimensions = await readImageDimensions(src);
+                    const fit = fitImageSize(dimensions.width, dimensions.height);
+                    const pos = getVisibleCanvasPlacement(fit.w, fit.h);
+                    addImageElement(src, pos.x, pos.y, fit.w, fit.h);
+                    revealCanvasArea();
+                    setEditorStatus("Image pasted from clipboard.");
+                } catch (error) {
+                    setEditorStatus(`Clipboard image paste failed: ${String(error?.message || error)}`, true);
+                }
             })();
         });
 
