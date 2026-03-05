@@ -123,12 +123,37 @@
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ") || "Untitled";
 
+    const extractLocalizedStringFields = (source, baseKey) => {
+        const result = {};
+        if (!source || typeof source !== "object") {
+            return result;
+        }
+
+        const prefix = `${baseKey}_`;
+        Object.keys(source).forEach((key) => {
+            if (!key.startsWith(prefix)) {
+                return;
+            }
+
+            const suffix = key.slice(prefix.length);
+            if (!suffix) {
+                return;
+            }
+
+            const value = source[key];
+            result[key] = value == null ? "" : String(value);
+        });
+
+        return result;
+    };
+
     const normalizeElement = (element, index) => {
         const rawType = String(element?.type || "");
         const type = rawType === "image" || rawType === "video" ? rawType : "text";
         const radiusRaw = Number(element?.radius ?? 8);
         const defaultW = type === "image" ? 240 : type === "video" ? 360 : 260;
         const defaultH = type === "image" ? 150 : type === "video" ? 202 : 90;
+        const localizedText = extractLocalizedStringFields(element, "text");
         return {
             id: String(element?.id || `el-${index + 1}`),
             type,
@@ -138,6 +163,7 @@
             h: Math.max(20, Number(element?.h ?? defaultH)),
             radius: Number.isFinite(radiusRaw) ? Math.max(0, radiusRaw) : 8,
             text: String(element?.text ?? "Text"),
+            ...localizedText,
             color: String(element?.color ?? "#ffffff"),
             background: String(element?.background ?? "transparent"),
             fontSize: Math.max(10, Number(element?.fontSize ?? 20)),
@@ -151,14 +177,20 @@
         const boundaryHeightRaw = Number(page?.layout?.boundaryHeight ?? DEFAULT_PAGE_BOUNDARY_HEIGHT);
         const normalizedBoundaryWidth = Math.max(320, Number.isFinite(boundaryWidthRaw) ? boundaryWidthRaw : DEFAULT_PAGE_BOUNDARY_WIDTH);
         const normalizedBoundaryHeight = Math.max(220, Number.isFinite(boundaryHeightRaw) ? boundaryHeightRaw : DEFAULT_PAGE_BOUNDARY_HEIGHT);
+        const localizedTitle = extractLocalizedStringFields(page, "title");
+        const localizedSubtitle = extractLocalizedStringFields(page, "subtitle");
 
         return {
             title: String(page?.title || fallbackTitle),
+            ...localizedTitle,
             subtitle: String(page?.subtitle || ""),
+            ...localizedSubtitle,
             sections: Array.isArray(page?.sections)
                 ? page.sections.map((section) => ({
                     heading: String(section?.heading || "Section"),
-                    body: String(section?.body || "")
+                    ...extractLocalizedStringFields(section, "heading"),
+                    body: String(section?.body || ""),
+                    ...extractLocalizedStringFields(section, "body")
                 }))
                 : [],
             canvas: {
