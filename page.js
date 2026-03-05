@@ -6,6 +6,9 @@
     const DOUBLE_F9_MS = 700;
     const AUTOSAVE_DELAY_MS = 900;
     const MAX_VIDEO_FILE_BYTES = 200 * 1024 * 1024;
+    const DEFAULT_CANVAS_WIDTH = 1200;
+    const DEFAULT_CANVAS_HEIGHT = 420;
+    const DEFAULT_PAGE_BOUNDARY_WIDTH = 1280;
 
     const DEFAULT_ICONS = [
         { slug: "wait", title: "Wait", mini: "minskillbuilderimg/minwait.png", full: "skillbulderimg/wait.png" },
@@ -71,8 +74,8 @@
             { heading: "Setup", body: `Configuration details and values for ${title}.` },
             { heading: "Tips", body: `Extra usage tips and practical combos for ${title}.` }
         ],
-        canvas: { width: 980, height: 420, background: "#1f1f1f", radius: 12 },
-        layout: { fullWidth: false },
+        canvas: { width: DEFAULT_CANVAS_WIDTH, height: DEFAULT_CANVAS_HEIGHT, background: "#1f1f1f", radius: 12 },
+        layout: { fullWidth: false, boundaryWidth: DEFAULT_PAGE_BOUNDARY_WIDTH },
         elements: []
     });
 
@@ -138,9 +141,10 @@
     };
 
     const normalizePage = (page, fallbackTitle) => {
-        const widthRaw = Number(page?.canvas?.width ?? 980);
-        const heightRaw = Number(page?.canvas?.height ?? 420);
+        const widthRaw = Number(page?.canvas?.width ?? DEFAULT_CANVAS_WIDTH);
+        const heightRaw = Number(page?.canvas?.height ?? DEFAULT_CANVAS_HEIGHT);
         const radiusRaw = Number(page?.canvas?.radius ?? 12);
+        const boundaryWidthRaw = Number(page?.layout?.boundaryWidth ?? DEFAULT_PAGE_BOUNDARY_WIDTH);
 
         return {
             title: String(page?.title || fallbackTitle),
@@ -152,13 +156,14 @@
                 }))
                 : [],
             canvas: {
-                width: Math.max(320, Number.isFinite(widthRaw) ? widthRaw : 980),
-                height: Math.max(220, Number.isFinite(heightRaw) ? heightRaw : 420),
+                width: Math.max(320, Number.isFinite(widthRaw) ? widthRaw : DEFAULT_CANVAS_WIDTH),
+                height: Math.max(220, Number.isFinite(heightRaw) ? heightRaw : DEFAULT_CANVAS_HEIGHT),
                 background: String(page?.canvas?.background || "#1f1f1f"),
                 radius: Math.max(0, Number.isFinite(radiusRaw) ? radiusRaw : 12)
             },
             layout: {
-                fullWidth: Boolean(page?.layout?.fullWidth)
+                fullWidth: Boolean(page?.layout?.fullWidth),
+                boundaryWidth: Math.max(900, Number.isFinite(boundaryWidthRaw) ? boundaryWidthRaw : DEFAULT_PAGE_BOUNDARY_WIDTH)
             },
             elements: Array.isArray(page?.elements)
                 ? page.elements.map((item, idx) => normalizeElement(item, idx))
@@ -208,6 +213,7 @@
                 canvas: document.getElementById("splitFreeCanvas")
             },
             standalone: {
+                card: document.querySelector(".page-card"),
                 title: document.getElementById("pageTitle"),
                 subtitle: document.getElementById("pageSubtitle"),
                 sections: document.getElementById("pageSections"),
@@ -434,12 +440,13 @@
             refs.subtitle.textContent = "No content for this page.";
             refs.sections.innerHTML = "";
             refs.canvas.innerHTML = "";
-            refs.canvas.style.width = "980px";
-            refs.canvas.style.height = "420px";
+            refs.canvas.style.width = `${DEFAULT_CANVAS_WIDTH}px`;
+            refs.canvas.style.height = `${DEFAULT_CANVAS_HEIGHT}px`;
             refs.canvas.style.background = "#1f1f1f";
             refs.canvas.style.borderRadius = "12px";
             if (refs.splitInner) {
                 refs.splitInner.classList.remove("is-full-width");
+                refs.splitInner.style.maxWidth = `${DEFAULT_PAGE_BOUNDARY_WIDTH}px`;
             }
             return;
         }
@@ -448,7 +455,11 @@
         refs.subtitle.textContent = page.subtitle;
         renderSections(refs.sections, page.sections, "split-section");
         if (refs.splitInner) {
-            refs.splitInner.classList.toggle("is-full-width", Boolean(page.layout?.fullWidth));
+            const fullWidth = Boolean(page.layout?.fullWidth);
+            refs.splitInner.classList.toggle("is-full-width", fullWidth);
+            refs.splitInner.style.maxWidth = fullWidth
+                ? "none"
+                : `${Math.max(900, Number(page.layout?.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH))}px`;
         }
         refs.canvas.style.width = `${page.canvas.width}px`;
         refs.canvas.style.height = `${page.canvas.height}px`;
@@ -475,16 +486,25 @@
             refs.subtitle.textContent = "No content for this page.";
             refs.sections.innerHTML = "";
             refs.canvas.innerHTML = "";
-            refs.canvas.style.width = "980px";
-            refs.canvas.style.height = "420px";
+            refs.canvas.style.width = `${DEFAULT_CANVAS_WIDTH}px`;
+            refs.canvas.style.height = `${DEFAULT_CANVAS_HEIGHT}px`;
             refs.canvas.style.background = "#1f1f1f";
             refs.canvas.style.borderRadius = "12px";
+            if (refs.card) {
+                refs.card.style.maxWidth = `${DEFAULT_PAGE_BOUNDARY_WIDTH}px`;
+            }
             return;
         }
 
         refs.title.textContent = page.title;
         refs.subtitle.textContent = page.subtitle;
         renderSections(refs.sections, page.sections, "page-section");
+        if (refs.card) {
+            const fullWidth = Boolean(page.layout?.fullWidth);
+            refs.card.style.maxWidth = fullWidth
+                ? "none"
+                : `${Math.max(900, Number(page.layout?.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH))}px`;
+        }
         refs.canvas.style.width = `${page.canvas.width}px`;
         refs.canvas.style.height = `${page.canvas.height}px`;
         refs.canvas.style.background = page.canvas.background;
@@ -732,13 +752,17 @@
         }
 
         if (page) {
-            setInputValueIfIdle(refs.canvasWidth, String(Math.round(page.canvas.width || 980)));
-            setInputValueIfIdle(refs.canvasHeight, String(Math.round(page.canvas.height || 420)));
+            setInputValueIfIdle(refs.canvasWidth, String(Math.round(page.canvas.width || DEFAULT_CANVAS_WIDTH)));
+            setInputValueIfIdle(refs.canvasHeight, String(Math.round(page.canvas.height || DEFAULT_CANVAS_HEIGHT)));
             setInputValueIfIdle(refs.canvasBackground, page.canvas.background || "#1f1f1f");
             setInputValueIfIdle(refs.canvasRadius, String(Math.round(page.canvas.radius || 0)));
             if (document.activeElement !== refs.layoutFullWidth) {
                 refs.layoutFullWidth.checked = Boolean(page.layout?.fullWidth);
             }
+            setInputValueIfIdle(
+                refs.layoutBoundaryWidth,
+                String(Math.round(Number(page.layout?.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH)))
+            );
             setInputValueIfIdle(refs.pageTitle, page.title);
             setInputValueIfIdle(refs.pageSubtitle, page.subtitle);
         }
@@ -1151,9 +1175,16 @@
                     <input type="checkbox" data-editor-layout-full-width>
                     Use full right panel width
                 </label>
+                <label class="site-editor-field">Page boundary width (px)
+                    <input type="number" min="900" data-editor-layout-boundary-width>
+                </label>
                 <div class="site-editor-row">
                     <button type="button" data-editor-canvas-expand>Expand canvas (+200 px)</button>
                     <button type="button" data-editor-canvas-shrink>Shrink canvas (-200 px)</button>
+                </div>
+                <div class="site-editor-row">
+                    <button type="button" data-editor-boundary-expand>Expand page boundary (+200 px)</button>
+                    <button type="button" data-editor-boundary-shrink>Shrink page boundary (-200 px)</button>
                 </div>
             </div>
             <div class="site-editor-group">
@@ -1279,6 +1310,7 @@
             canvasBackground: q("[data-editor-canvas-background]"),
             canvasRadius: q("[data-editor-canvas-radius]"),
             layoutFullWidth: q("[data-editor-layout-full-width]"),
+            layoutBoundaryWidth: q("[data-editor-layout-boundary-width]"),
             pageTitle: q("[data-editor-page-title]"),
             pageSubtitle: q("[data-editor-page-subtitle]"),
             sectionsWrap: q("[data-editor-sections]"),
@@ -1421,12 +1453,17 @@
             }
 
             if (!page.layout || typeof page.layout !== "object") {
-                page.layout = { fullWidth: false };
+                page.layout = { fullWidth: false, boundaryWidth: DEFAULT_PAGE_BOUNDARY_WIDTH };
             }
+            if (!Number.isFinite(Number(page.layout.boundaryWidth))) {
+                page.layout.boundaryWidth = DEFAULT_PAGE_BOUNDARY_WIDTH;
+            }
+            page.layout.fullWidth = Boolean(page.layout.fullWidth);
             updater(page);
-            page.canvas.width = Math.max(320, Math.round(Number(page.canvas.width || 980)));
-            page.canvas.height = Math.max(220, Math.round(Number(page.canvas.height || 420)));
+            page.canvas.width = Math.max(320, Math.round(Number(page.canvas.width || DEFAULT_CANVAS_WIDTH)));
+            page.canvas.height = Math.max(220, Math.round(Number(page.canvas.height || DEFAULT_CANVAS_HEIGHT)));
             page.canvas.radius = Math.max(0, Math.round(Number(page.canvas.radius || 0)));
+            page.layout.boundaryWidth = Math.max(900, Math.round(Number(page.layout.boundaryWidth || DEFAULT_PAGE_BOUNDARY_WIDTH)));
             clampElementsToCanvas(page);
             saveLocalData();
             renderMain({ syncEditor: true });
@@ -1478,6 +1515,17 @@
             }, "Page width mode updated.");
         });
 
+        state.editor.refs.layoutBoundaryWidth.addEventListener("input", () => {
+            const numeric = Number(state.editor.refs.layoutBoundaryWidth.value);
+            if (!Number.isFinite(numeric)) {
+                return;
+            }
+            updateCanvas((page) => {
+                page.layout.boundaryWidth = numeric;
+                page.layout.fullWidth = false;
+            }, "Page boundary width updated.");
+        });
+
         q("[data-editor-canvas-expand]").addEventListener("click", () => {
             updateCanvas((page) => {
                 page.canvas.width += 200;
@@ -1491,6 +1539,20 @@
                 page.canvas.width = Math.max(320, page.canvas.width - 200);
                 page.canvas.height = Math.max(220, page.canvas.height - 120);
             }, "Canvas size reduced.");
+        });
+
+        q("[data-editor-boundary-expand]").addEventListener("click", () => {
+            updateCanvas((page) => {
+                page.layout.boundaryWidth += 200;
+                page.layout.fullWidth = false;
+            }, "Page boundary expanded.");
+        });
+
+        q("[data-editor-boundary-shrink]").addEventListener("click", () => {
+            updateCanvas((page) => {
+                page.layout.boundaryWidth = Math.max(900, page.layout.boundaryWidth - 200);
+                page.layout.fullWidth = false;
+            }, "Page boundary reduced.");
         });
 
         state.editor.refs.pageTitle.addEventListener("input", () => {
