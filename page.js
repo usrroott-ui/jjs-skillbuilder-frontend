@@ -1024,6 +1024,20 @@
         };
     };
 
+    const revealCanvasArea = () => {
+        const canvas = state.refs.index?.canvas;
+        if (!canvas) {
+            return;
+        }
+
+        const wrap = canvas.parentElement || canvas;
+        wrap.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest"
+        });
+    };
+
     const removeSelectedElement = () => {
         const page = getCurrentPage();
         if (!page) {
@@ -1519,6 +1533,7 @@
                 state.editor.placeMode = null;
                 const pos = getVisibleCanvasPlacement(prepared.width, prepared.height);
                 addVideoElement(prepared.src, pos.x, pos.y, prepared.width, prepared.height);
+                revealCanvasArea();
                 setEditorStatus(`Video added (${prepared.name}). Drag it to move.`);
             });
         });
@@ -1961,6 +1976,7 @@
                 const x = clamp(Math.round(point.x), 0, Math.max(0, page.canvas.width - prepared.width));
                 const y = clamp(Math.round(point.y), 0, Math.max(0, page.canvas.height - prepared.height));
                 addVideoElement(prepared.src, x, y, prepared.width, prepared.height);
+                revealCanvasArea();
                 setEditorStatus(`Video added from drag-and-drop (${prepared.name}).`);
             })();
         });
