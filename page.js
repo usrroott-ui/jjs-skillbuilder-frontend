@@ -241,7 +241,10 @@
             placeMode: null,
             lastF9At: 0,
             pendingFileAction: null,
-            canvasBound: false
+            canvasBound: false,
+            lastStatusMessage: "",
+            lastStatusIsError: false,
+            lastStatusAt: 0
         }
     };
 
@@ -612,8 +615,24 @@
         if (!state.editor.refs?.status) {
             return;
         }
-        state.editor.refs.status.textContent = message;
-        state.editor.refs.status.classList.toggle("is-error", Boolean(isError));
+        const text = String(message || "").trim();
+        const errorFlag = Boolean(isError);
+        const now = Date.now();
+        const isDuplicate = (
+            state.editor.lastStatusMessage === text
+            && state.editor.lastStatusIsError === errorFlag
+            && now - state.editor.lastStatusAt < 1500
+        );
+        if (isDuplicate) {
+            return;
+        }
+
+        state.editor.lastStatusMessage = text;
+        state.editor.lastStatusIsError = errorFlag;
+        state.editor.lastStatusAt = now;
+
+        state.editor.refs.status.textContent = text;
+        state.editor.refs.status.classList.toggle("is-error", errorFlag);
     };
 
     const setInputValueIfIdle = (input, value) => {
@@ -1925,7 +1944,6 @@
             const sessionPayload = await sessionResponse.json().catch(() => ({}));
             if (sessionResponse.ok && sessionPayload?.authorized) {
                 state.editor.authorized = true;
-                setEditorStatus("Authorized session found.");
                 return true;
             }
 
