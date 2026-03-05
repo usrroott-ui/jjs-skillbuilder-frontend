@@ -6,7 +6,7 @@ Static UI for JJS Skillbuilder.
 
 - Press `F9` twice quickly.
 - If there is no active cookie session, key prompt will appear.
-- After successful auth, editor opens at `editor.html`.
+- After successful auth, inline editor panel opens directly on `index.html`.
 
 ## Local run
 
