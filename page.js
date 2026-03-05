@@ -2,6 +2,7 @@
     const LOCAL_DATA_KEY = "JJS_SKILLBUILDER_DATA";
     const BACKEND_URL_STORAGE_KEY = "JJS_BACKEND_URL";
     const EDITOR_TOKEN_STORAGE_KEY = "JJS_EDITOR_TOKEN";
+    const LANG_STORAGE_KEY = "JJS_LANG";
     const DEFAULT_BACKEND_URL = "https://jjs-skillbuilder-backend.onrender.com";
     const DOUBLE_F9_MS = 700;
     const AUTOSAVE_DELAY_MS = 900;
@@ -227,6 +228,7 @@
                 canvas: document.getElementById("pageFreeCanvas")
             }
         },
+        lang: localStorage.getItem(LANG_STORAGE_KEY) || "en",
         indexLinks: [],
         editor: {
             enabled: false,
@@ -265,6 +267,22 @@
     const publishGlobals = () => {
         window.SKILLBUILDER_DATA = state.data;
         window.SKILLBUILDER_PAGES = state.data.pages;
+    };
+
+    const getElementText = (element) => {
+        if (state.lang !== "en") {
+            const localized = element[`text_${state.lang}`];
+            if (localized) return localized;
+        }
+        return element.text || "";
+    };
+
+    const getLocalizedField = (obj, field) => {
+        if (state.lang !== "en") {
+            const localized = obj[`${field}_${state.lang}`];
+            if (localized) return localized;
+        }
+        return obj[field] || "";
     };
 
     const loadLocalData = () => {
@@ -399,10 +417,10 @@
             card.className = sectionClass;
 
             const heading = document.createElement("h3");
-            heading.textContent = section.heading;
+            heading.textContent = getLocalizedField(section, "heading");
 
             const body = document.createElement("p");
-            body.textContent = section.body;
+            body.textContent = getLocalizedField(section, "body");
 
             card.appendChild(heading);
             card.appendChild(body);
@@ -446,7 +464,7 @@
                 video.playsInline = true;
                 node.appendChild(video);
             } else {
-                node.textContent = element.text;
+                node.textContent = getElementText(element);
                 node.style.color = element.color;
                 node.style.background = element.background;
                 node.style.fontSize = `${element.fontSize}px`;
@@ -480,8 +498,8 @@
             return;
         }
 
-        refs.title.textContent = page.title;
-        refs.subtitle.textContent = page.subtitle;
+        refs.title.textContent = getLocalizedField(page, "title");
+        refs.subtitle.textContent = getLocalizedField(page, "subtitle");
         syncCanvasToPageBoundary(page);
         clampElementsToCanvas(page);
         renderSections(refs.sections, page.sections, "split-section");
@@ -525,8 +543,8 @@
             return;
         }
 
-        refs.title.textContent = page.title;
-        refs.subtitle.textContent = page.subtitle;
+        refs.title.textContent = getLocalizedField(page, "title");
+        refs.subtitle.textContent = getLocalizedField(page, "subtitle");
         syncCanvasToPageBoundary(page);
         clampElementsToCanvas(page);
         renderSections(refs.sections, page.sections, "page-section");
@@ -684,9 +702,19 @@
             const heading = document.createElement("input");
             heading.type = "text";
             heading.value = section.heading;
-            heading.placeholder = "Section heading";
+            heading.placeholder = "Heading (EN)";
             heading.addEventListener("input", () => {
                 section.heading = heading.value;
+                saveLocalData();
+                renderMain();
+            });
+
+            const headingRu = document.createElement("input");
+            headingRu.type = "text";
+            headingRu.value = section.heading_ru || "";
+            headingRu.placeholder = "Heading (RU)";
+            headingRu.addEventListener("input", () => {
+                section.heading_ru = headingRu.value;
                 saveLocalData();
                 renderMain();
             });
@@ -694,9 +722,19 @@
             const body = document.createElement("textarea");
             body.rows = 3;
             body.value = section.body;
-            body.placeholder = "Section body";
+            body.placeholder = "Body (EN)";
             body.addEventListener("input", () => {
                 section.body = body.value;
+                saveLocalData();
+                renderMain();
+            });
+
+            const bodyRu = document.createElement("textarea");
+            bodyRu.rows = 3;
+            bodyRu.value = section.body_ru || "";
+            bodyRu.placeholder = "Body (RU)";
+            bodyRu.addEventListener("input", () => {
+                section.body_ru = bodyRu.value;
                 saveLocalData();
                 renderMain();
             });
@@ -711,7 +749,9 @@
             });
 
             row.appendChild(heading);
+            row.appendChild(headingRu);
             row.appendChild(body);
+            row.appendChild(bodyRu);
             row.appendChild(removeBtn);
             state.editor.refs.sectionsWrap.appendChild(row);
         });
@@ -743,6 +783,7 @@
         }
 
         setInputValueIfIdle(refs.elText, element.text || "");
+        setInputValueIfIdle(refs.elTextRu, element.text_ru || "");
         setInputValueIfIdle(refs.elSrc, element.src || "");
         setInputValueIfIdle(refs.elX, String(Math.round(element.x)));
         setInputValueIfIdle(refs.elY, String(Math.round(element.y)));
@@ -797,7 +838,9 @@
                 String(Math.round(Number(page.layout?.boundaryHeight || DEFAULT_PAGE_BOUNDARY_HEIGHT)))
             );
             setInputValueIfIdle(refs.pageTitle, page.title);
+            setInputValueIfIdle(refs.pageTitleRu, page.title_ru || "");
             setInputValueIfIdle(refs.pageSubtitle, page.subtitle);
+            setInputValueIfIdle(refs.pageSubtitleRu, page.subtitle_ru || "");
         }
 
         syncEditorSections();
@@ -1232,11 +1275,17 @@
             </div>
             <div class="site-editor-group">
                 <p class="site-editor-group-title">Page Content</p>
-                <label class="site-editor-field">Page title
+                <label class="site-editor-field">Page title (EN)
                     <input type="text" data-editor-page-title>
                 </label>
-                <label class="site-editor-field">Page subtitle
+                <label class="site-editor-field">Page title (RU)
+                    <input type="text" data-editor-page-title-ru>
+                </label>
+                <label class="site-editor-field">Page subtitle (EN)
                     <textarea rows="3" data-editor-page-subtitle></textarea>
+                </label>
+                <label class="site-editor-field">Page subtitle (RU)
+                    <textarea rows="3" data-editor-page-subtitle-ru></textarea>
                 </label>
                 <div class="site-editor-row">
                     <button type="button" data-editor-add-section>Add section block</button>
@@ -1253,8 +1302,11 @@
                 </div>
                 <p class="site-editor-meta" data-editor-element-meta>No selected element</p>
                 <div data-editor-element-text-wrap>
-                    <label class="site-editor-field">Text content
+                    <label class="site-editor-field">Text content (EN)
                         <textarea rows="3" data-editor-element-text></textarea>
+                    </label>
+                    <label class="site-editor-field">Text content (RU)
+                        <textarea rows="3" data-editor-element-text-ru></textarea>
                     </label>
                 </div>
                 <div data-editor-element-src-wrap>
@@ -1356,13 +1408,16 @@
             layoutBoundaryWidth: q("[data-editor-layout-boundary-width]"),
             layoutBoundaryHeight: q("[data-editor-layout-boundary-height]"),
             pageTitle: q("[data-editor-page-title]"),
+            pageTitleRu: q("[data-editor-page-title-ru]"),
             pageSubtitle: q("[data-editor-page-subtitle]"),
+            pageSubtitleRu: q("[data-editor-page-subtitle-ru]"),
             sectionsWrap: q("[data-editor-sections]"),
             elementMeta: q("[data-editor-element-meta]"),
             elementTextWrap: q("[data-editor-element-text-wrap]"),
             elementSrcWrap: q("[data-editor-element-src-wrap]"),
             elementSrcLabel: q("[data-editor-element-src-label]"),
             elText: q("[data-editor-element-text]"),
+            elTextRu: q("[data-editor-element-text-ru]"),
             elSrc: q("[data-editor-element-src]"),
             elX: q("[data-editor-el-x]"),
             elY: q("[data-editor-el-y]"),
@@ -1645,12 +1700,32 @@
             renderMain();
         });
 
+        state.editor.refs.pageTitleRu.addEventListener("input", () => {
+            const page = getCurrentPage();
+            if (!page) {
+                return;
+            }
+            page.title_ru = state.editor.refs.pageTitleRu.value;
+            saveLocalData();
+            renderMain();
+        });
+
         state.editor.refs.pageSubtitle.addEventListener("input", () => {
             const page = getCurrentPage();
             if (!page) {
                 return;
             }
             page.subtitle = state.editor.refs.pageSubtitle.value;
+            saveLocalData();
+            renderMain();
+        });
+
+        state.editor.refs.pageSubtitleRu.addEventListener("input", () => {
+            const page = getCurrentPage();
+            if (!page) {
+                return;
+            }
+            page.subtitle_ru = state.editor.refs.pageSubtitleRu.value;
             saveLocalData();
             renderMain();
         });
@@ -1712,6 +1787,16 @@
                 return;
             }
             element.text = state.editor.refs.elText.value;
+            saveLocalData();
+            renderMain();
+        });
+
+        state.editor.refs.elTextRu.addEventListener("input", () => {
+            const element = getSelectedElement();
+            if (!element || element.type !== "text") {
+                return;
+            }
+            element.text_ru = state.editor.refs.elTextRu.value;
             saveLocalData();
             renderMain();
         });
@@ -2332,6 +2417,45 @@
 
         initHotkey();
         connectLiveStream();
+        initLangSwitch();
+    };
+
+    const initLangSwitch = () => {
+        const switchEl = document.getElementById("langSwitch");
+        const btn = document.getElementById("langBtn");
+        const menu = document.getElementById("langMenu");
+        if (!switchEl || !btn || !menu) return;
+
+        btn.textContent = state.lang.toUpperCase();
+
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            switchEl.classList.toggle("is-open");
+        });
+
+        menu.addEventListener("click", (e) => {
+            const option = e.target.closest("[data-lang]");
+            if (!option) return;
+            const lang = option.dataset.lang;
+            if (lang === state.lang) {
+                switchEl.classList.remove("is-open");
+                return;
+            }
+            state.lang = lang;
+            localStorage.setItem(LANG_STORAGE_KEY, lang);
+            btn.textContent = lang.toUpperCase();
+            switchEl.classList.remove("is-open");
+            if (isIndexPage()) {
+                renderMain({ syncEditor: true });
+            }
+            if (isStandalonePage()) {
+                renderStandalone();
+            }
+        });
+
+        document.addEventListener("click", () => {
+            switchEl.classList.remove("is-open");
+        });
     };
 
     const connectLiveStream = () => {
