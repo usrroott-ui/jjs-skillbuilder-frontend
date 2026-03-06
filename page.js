@@ -1429,7 +1429,7 @@
         };
 
         q("[data-editor-close]").addEventListener("click", () => {
-            disableEditor();
+            void disableEditor();
         });
 
         q("[data-editor-connect]").addEventListener("click", async () => {
@@ -1447,7 +1447,7 @@
         });
 
         q("[data-editor-save-backend]").addEventListener("click", async () => {
-            await saveToBackend();
+            await saveToBackend({ promptForKeyOnAuthFail: true });
         });
 
         q("[data-editor-migrate-videos]").addEventListener("click", async () => {
@@ -1901,8 +1901,18 @@
         renderMain({ syncEditor: true });
     };
 
-    const disableEditor = () => {
-        const shouldSyncOnClose = state.editor.hasUnsavedChanges;
+    const disableEditor = async () => {
+        if (state.editor.hasUnsavedChanges) {
+            const saved = await saveToBackend({
+                silent: false,
+                requireEnabled: false,
+                promptForKeyOnAuthFail: true
+            });
+            if (!saved) {
+                setEditorStatus("Save failed. Editor stays open.", true);
+                return false;
+            }
+        }
 
         state.editor.enabled = false;
         state.editor.placeMode = null;
@@ -1914,10 +1924,7 @@
         }
 
         renderMain();
-
-        if (shouldSyncOnClose) {
-            void saveToBackend({ silent: true, requireEnabled: false });
-        }
+        return true;
     };
 
     const isMixedContentBlocked = (apiBase) => (
@@ -2029,12 +2036,19 @@
         }
     };
 
-    const saveToBackend = async ({ silent = false, requireEnabled = true } = {}) => {
+    const saveToBackend = async ({
+        silent = false,
+        requireEnabled = true,
+        promptForKeyOnAuthFail = false
+    } = {}) => {
         if (requireEnabled && !state.editor.enabled) {
             return false;
         }
 
-        const ok = await requestEditorAccess(false);
+        let ok = await requestEditorAccess(false);
+        if (!ok && promptForKeyOnAuthFail) {
+            ok = await requestEditorAccess(true);
+        }
         if (!ok) {
             if (!silent) {
                 setEditorStatus("Not authorized. Press Connect or F9 x2.", true);
@@ -2343,7 +2357,7 @@
                 state.editor.lastF9At = 0;
                 void (async () => {
                     if (state.editor.enabled) {
-                        disableEditor();
+                        await disableEditor();
                         return;
                     }
 
