@@ -1,5 +1,5 @@
 ﻿(() => {
-    const LOCAL_DATA_KEY = "JJS_SKILLBUILDER_DATA";
+    const LEGACY_LOCAL_DATA_KEY = "JJS_SKILLBUILDER_DATA";
     const LANG_STORAGE_KEY = "JJS_LANG";
     const DEFAULT_BACKEND_URL = "https://jjs-skillbuilder-backend.onrender.com";
 
@@ -305,24 +305,6 @@
             }
         }
         return element?.text || "";
-    };
-
-    const loadLocalData = () => {
-        try {
-            const raw = localStorage.getItem(LOCAL_DATA_KEY);
-            return raw ? JSON.parse(raw) : null;
-        } catch (_error) {
-            return null;
-        }
-    };
-
-    const saveLocalData = () => {
-        try {
-            localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(state.data));
-            return true;
-        } catch (_error) {
-            return false;
-        }
     };
 
     const getSlugFromHash = () => window.location.hash.replace(/^#/, "");
@@ -698,7 +680,6 @@
 
                 state.data = normalizeData(payload.data);
                 ensureCurrentSlug();
-                saveLocalData();
 
                 if (isIndexPage()) {
                     buildIconList();
@@ -720,13 +701,15 @@
 
     const bootstrap = async () => {
         const apiBase = normalizeApiBase(DEFAULT_BACKEND_URL);
-        const localData = loadLocalData();
         const remoteData = await fetchPublicData(apiBase);
-        const initial = normalizeData(remoteData || window.SKILLBUILDER_DATA || localData || makeDefaultData());
+        const initial = normalizeData(remoteData || window.SKILLBUILDER_DATA || makeDefaultData());
         state.data = initial;
 
-        if (remoteData) {
-            saveLocalData();
+        // Remove legacy per-browser cache so content is never sourced from local storage.
+        try {
+            localStorage.removeItem(LEGACY_LOCAL_DATA_KEY);
+        } catch (_error) {
+            // ignore
         }
 
         const hashSlug = getSlugFromHash();
