@@ -307,6 +307,51 @@
         return element?.text || "";
     };
 
+    const renderBootState = (title, subtitle, canvasMessage = "") => {
+        if (isIndexPage()) {
+            const refs = state.refs.index;
+            refs.title.textContent = title;
+            refs.subtitle.textContent = subtitle;
+            refs.sections.innerHTML = "";
+            refs.canvas.innerHTML = "";
+            refs.canvas.style.width = `${DEFAULT_CANVAS_WIDTH}px`;
+            refs.canvas.style.height = `${DEFAULT_CANVAS_HEIGHT}px`;
+            refs.canvas.style.background = "#1f1f1f";
+            refs.canvas.style.borderRadius = "12px";
+            if (refs.splitInner) {
+                refs.splitInner.classList.remove("is-full-width");
+                refs.splitInner.style.maxWidth = `${DEFAULT_PAGE_BOUNDARY_WIDTH}px`;
+            }
+            if (canvasMessage) {
+                const note = document.createElement("div");
+                note.className = "boot-message";
+                note.textContent = canvasMessage;
+                refs.canvas.appendChild(note);
+            }
+        }
+
+        if (isStandalonePage()) {
+            const refs = state.refs.standalone;
+            refs.title.textContent = title;
+            refs.subtitle.textContent = subtitle;
+            refs.sections.innerHTML = "";
+            refs.canvas.innerHTML = "";
+            refs.canvas.style.width = `${DEFAULT_CANVAS_WIDTH}px`;
+            refs.canvas.style.height = `${DEFAULT_CANVAS_HEIGHT}px`;
+            refs.canvas.style.background = "#1f1f1f";
+            refs.canvas.style.borderRadius = "12px";
+            if (refs.card) {
+                refs.card.style.maxWidth = `${DEFAULT_PAGE_BOUNDARY_WIDTH}px`;
+            }
+            if (canvasMessage) {
+                const note = document.createElement("div");
+                note.className = "boot-message";
+                note.textContent = canvasMessage;
+                refs.canvas.appendChild(note);
+            }
+        }
+    };
+
     const getSlugFromHash = () => window.location.hash.replace(/^#/, "");
 
     const ensureCurrentSlug = () => {
@@ -701,6 +746,11 @@
 
     const bootstrap = async () => {
         const apiBase = normalizeApiBase(DEFAULT_BACKEND_URL);
+        renderBootState(
+            "Activating site...",
+            "The backend is waking up on Render. Please wait a few seconds.",
+            "Activating site..."
+        );
         const remoteData = await fetchPublicData(apiBase);
         const initial = normalizeData(remoteData || window.SKILLBUILDER_DATA || makeDefaultData());
         state.data = initial;
