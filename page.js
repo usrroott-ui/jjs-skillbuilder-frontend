@@ -84,11 +84,19 @@
         elements: []
     });
 
+    const normalizeIconLink = (value) => String(value || "").trim();
+    const iconHasLink = (icon) => normalizeIconLink(icon?.url).length > 0;
+
     const makeDefaultData = () => {
-        const icons = DEFAULT_ICONS.map((icon) => ({ ...icon }));
+        const icons = DEFAULT_ICONS.map((icon) => ({
+            ...icon,
+            url: normalizeIconLink(icon?.url || "")
+        }));
         const pages = {};
         icons.forEach((icon) => {
-            pages[icon.slug] = defaultPageFor(icon.title);
+            if (!iconHasLink(icon)) {
+                pages[icon.slug] = defaultPageFor(icon.title);
+            }
         });
         return { icons, pages };
     };
@@ -227,13 +235,16 @@
                 slug,
                 title: String(icon?.title || humanizeSlug(slug)),
                 mini: String(icon?.mini || ""),
-                full: String(icon?.full || "")
+                full: String(icon?.full || ""),
+                url: normalizeIconLink(icon?.url || icon?.link || "")
             };
         });
 
         const pages = {};
         icons.forEach((icon) => {
-            pages[icon.slug] = normalizePage(sourcePages[icon.slug], icon.title);
+            if (!iconHasLink(icon)) {
+                pages[icon.slug] = normalizePage(sourcePages[icon.slug], icon.title);
+            }
         });
 
         return { icons, pages };
@@ -356,18 +367,27 @@
             state.data = makeDefaultData();
         }
 
+        state.data.icons.forEach((icon) => {
+            if (!icon) {
+                return;
+            }
+            icon.url = normalizeIconLink(icon.url);
+            if (iconHasLink(icon)) {
+                delete state.data.pages[icon.slug];
+                return;
+            }
+            if (!state.data.pages[icon.slug]) {
+                state.data.pages[icon.slug] = defaultPageFor(icon.title || "Page");
+            }
+        });
+
         if (!state.data.icons.some((icon) => icon.slug === state.currentSlug)) {
             state.currentSlug = state.data.icons[0]?.slug || "";
-        }
-
-        if (state.currentSlug && !state.data.pages[state.currentSlug]) {
-            const icon = state.data.icons.find((item) => item.slug === state.currentSlug);
-            state.data.pages[state.currentSlug] = defaultPageFor(icon?.title || "Page");
         }
     };
 
     const setCurrentSlug = (slug, syncHash = true) => {
-        if (!slug || !state.data.pages[slug]) {
+        if (!slug || !state.data.icons.some((icon) => icon.slug === slug)) {
             return;
         }
 
@@ -377,7 +397,13 @@
         }
     };
 
-    const getCurrentPage = () => state.data.pages[state.currentSlug] || null;
+    const getCurrentPage = () => {
+        const icon = state.data.icons.find((item) => item.slug === state.currentSlug);
+        if (!icon || iconHasLink(icon)) {
+            return null;
+        }
+        return state.data.pages[state.currentSlug] || null;
+    };
 
     const getSelectedElement = () => {
         const page = getCurrentPage();
@@ -514,12 +540,18 @@
             return;
         }
 
+        const currentIcon = state.data.icons.find((icon) => icon.slug === state.currentSlug) || null;
         const page = getCurrentPage();
         const refs = state.refs.index;
 
         if (!page) {
-            refs.title.textContent = "Page not found";
-            refs.subtitle.textContent = "No content for this page.";
+            if (currentIcon && iconHasLink(currentIcon)) {
+                refs.title.textContent = currentIcon.title || "External link";
+                refs.subtitle.textContent = `This icon opens: ${normalizeIconLink(currentIcon.url)}`;
+            } else {
+                refs.title.textContent = "Page not found";
+                refs.subtitle.textContent = "No content for this page.";
+            }
             refs.sections.innerHTML = "";
             refs.canvas.innerHTML = "";
             refs.canvas.style.width = `${DEFAULT_CANVAS_WIDTH}px`;
@@ -606,7 +638,8 @@
         state.data.icons.forEach((icon) => {
             const link = document.createElement("a");
             link.className = "icon-link";
-            link.href = `page.html#${icon.slug}`;
+            const targetUrl = normalizeIconLink(icon.url);
+            link.href = targetUrl || `page.html#${icon.slug}`;
             link.title = icon.title;
             link.dataset.slug = icon.slug;
 
@@ -619,6 +652,17 @@
             state.refs.index.iconList.appendChild(link);
 
             link.addEventListener("click", (event) => {
+                if (iconHasLink(icon) && !state.editor.enabled) {
+                    return;
+                }
+
+                if (state.editor.enabled) {
+                    event.preventDefault();
+                    setCurrentSlug(icon.slug, true);
+                    renderMain({ syncEditor: true });
+                    return;
+                }
+
                 if (event.metaKey || event.ctrlKey || event.shiftKey || event.button === 1) {
                     return;
                 }
@@ -804,7 +848,8 @@
         state.data.icons.forEach((entry) => {
             const option = document.createElement("option");
             option.value = entry.slug;
-            option.textContent = `${entry.title} (${entry.slug})`;
+            const typeLabel = iconHasLink(entry) ? " [link]" : "";
+            option.textContent = `${entry.title} (${entry.slug})${typeLabel}`;
             option.selected = entry.slug === state.currentSlug;
             refs.iconSelect.appendChild(option);
         });
@@ -814,6 +859,7 @@
         if (icon) {
             setInputValueIfIdle(refs.iconTitle, icon.title);
             setInputValueIfIdle(refs.iconSlug, icon.slug);
+            setInputValueIfIdle(refs.iconLink, normalizeIconLink(icon.url));
             setInputValueIfIdle(refs.iconMini, icon.mini);
             setInputValueIfIdle(refs.iconFull, icon.full);
         }
@@ -838,6 +884,11 @@
             setInputValueIfIdle(refs.pageTitleRu, page.title_ru || "");
             setInputValueIfIdle(refs.pageSubtitle, page.subtitle);
             setInputValueIfIdle(refs.pageSubtitleRu, page.subtitle_ru || "");
+        } else {
+            setInputValueIfIdle(refs.pageTitle, "");
+            setInputValueIfIdle(refs.pageTitleRu, "");
+            setInputValueIfIdle(refs.pageSubtitle, "");
+            setInputValueIfIdle(refs.pageSubtitleRu, "");
         }
 
         syncEditorSections();
@@ -971,7 +1022,11 @@
 
         const oldSlug = icon.slug;
         icon.slug = nextSlug;
-        state.data.pages[nextSlug] = normalizePage(state.data.pages[oldSlug], icon.title);
+        if (!iconHasLink(icon)) {
+            state.data.pages[nextSlug] = normalizePage(state.data.pages[oldSlug], icon.title);
+        } else {
+            delete state.data.pages[nextSlug];
+        }
         delete state.data.pages[oldSlug];
         setCurrentSlug(nextSlug, true);
         saveLocalData();
@@ -981,9 +1036,11 @@
     const addIcon = () => {
         const used = new Set(state.data.icons.map((icon) => icon.slug));
         const slug = uniqueSlug("new-icon", used);
-        const icon = { slug, title: "New Icon", mini: "", full: "" };
+        const icon = { slug, title: "New Icon", mini: "", full: "", url: "" };
         state.data.icons.push(icon);
-        state.data.pages[slug] = defaultPageFor(icon.title);
+        if (!iconHasLink(icon)) {
+            state.data.pages[slug] = defaultPageFor(icon.title);
+        }
         setCurrentSlug(slug, true);
         saveLocalData();
         renderMain({ rebuildIcons: true, syncEditor: true });
@@ -1218,6 +1275,9 @@
                     </label>
                     <button type="button" data-editor-icon-apply-slug>Apply new slug</button>
                 </div>
+                <label class="site-editor-field">Icon link (optional)
+                    <input type="text" data-editor-icon-link placeholder="https://example.com">
+                </label>
                 <div class="site-editor-row">
                     <label class="site-editor-field">Mini icon source
                         <input type="text" data-editor-icon-mini>
@@ -1395,6 +1455,7 @@
             iconSelect: q("[data-editor-icon-select]"),
             iconTitle: q("[data-editor-icon-title]"),
             iconSlug: q("[data-editor-icon-slug]"),
+            iconLink: q("[data-editor-icon-link]"),
             iconMini: q("[data-editor-icon-mini]"),
             iconFull: q("[data-editor-icon-full]"),
             canvasWidth: q("[data-editor-canvas-width]"),
@@ -1484,17 +1545,35 @@
         state.editor.refs.iconTitle.addEventListener("input", () => {
             const icon = state.data.icons.find((entry) => entry.slug === state.currentSlug);
             const page = getCurrentPage();
-            if (!icon || !page) {
+            if (!icon) {
                 return;
             }
 
             const oldTitle = icon.title;
             icon.title = state.editor.refs.iconTitle.value;
-            if (page.title === oldTitle) {
+            if (page && page.title === oldTitle) {
                 page.title = icon.title;
             }
             saveLocalData();
             renderMain({ rebuildIcons: true });
+        });
+
+        state.editor.refs.iconLink.addEventListener("input", () => {
+            const icon = state.data.icons.find((entry) => entry.slug === state.currentSlug);
+            if (!icon) {
+                return;
+            }
+
+            icon.url = normalizeIconLink(state.editor.refs.iconLink.value);
+            if (iconHasLink(icon)) {
+                delete state.data.pages[icon.slug];
+                state.editor.selectedElementId = "";
+            } else if (!state.data.pages[icon.slug]) {
+                state.data.pages[icon.slug] = defaultPageFor(icon.title || "Page");
+            }
+
+            saveLocalData();
+            renderMain({ rebuildIcons: true, syncEditor: true });
         });
 
         q("[data-editor-icon-apply-slug]").addEventListener("click", () => {
@@ -2401,7 +2480,7 @@
         }
 
         const hashSlug = getSlugFromHash();
-        const initialSlug = state.data.pages[hashSlug]
+        const initialSlug = state.data.icons.some((icon) => icon.slug === hashSlug)
             ? hashSlug
             : state.data.icons[0]?.slug || "";
         setCurrentSlug(initialSlug, false);
@@ -2412,7 +2491,7 @@
         if (isIndexPage()) {
             window.addEventListener("hashchange", () => {
                 const slug = getSlugFromHash();
-                if (state.data.pages[slug]) {
+                if (state.data.icons.some((icon) => icon.slug === slug)) {
                     setCurrentSlug(slug, false);
                     renderMain({ syncEditor: true });
                 }
