@@ -109,7 +109,8 @@ body {
     border-radius: 14px;
     background: var(--panel);
     padding: 18px;
-    overflow-x: hidden;
+    overflow-x: visible;
+    min-width: 0;
 }
 
 #pageTitle {
@@ -154,12 +155,15 @@ body {
     border: 1px solid #353535;
     border-radius: 12px;
     background: #1f1f1f;
-    overflow: hidden;
+    overflow: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
 }
 
 .free-canvas {
     position: relative;
     min-height: 420px;
+    min-width: 100%;
     overflow: hidden;
 }
 
@@ -191,9 +195,28 @@ body {
     background: #000;
 }
 
+@media (max-width: 900px) {
+    .page-header {
+        padding: 8px;
+    }
+
+    .page-shell {
+        padding: 0 8px 10px;
+    }
+
+    .page-card {
+        max-width: none;
+        padding: 14px;
+    }
+
+    #pageTitle {
+        overflow-wrap: anywhere;
+    }
+}
+
 @media (max-width: 640px) {
     .page-card {
-        padding: 14px;
+        padding: 12px;
     }
 
     .page-section h3 {
