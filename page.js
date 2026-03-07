@@ -56,6 +56,13 @@
     };
 
     const normalizeIconLink = (value) => String(value || "").trim();
+    const normalizeIconTopSpace = (value) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) {
+            return 0;
+        }
+        return clamp(Math.round(numeric), 0, 2000);
+    };
     const iconHasLink = (icon) => normalizeIconLink(icon?.url).length > 0;
 
     const defaultPageFor = (title) => ({
@@ -76,7 +83,11 @@
     });
 
     const makeDefaultData = () => {
-        const icons = DEFAULT_ICONS.map((icon) => ({ ...icon, url: "" }));
+        const icons = DEFAULT_ICONS.map((icon) => ({
+            ...icon,
+            url: normalizeIconLink(icon?.url || ""),
+            topSpace: normalizeIconTopSpace(icon?.topSpace ?? icon?.spaceBefore ?? icon?.offsetTop ?? icon?.offsetY ?? 0)
+        }));
         const pages = {};
         icons.forEach((icon) => {
             if (!iconHasLink(icon)) {
@@ -217,7 +228,8 @@
                 title: String(icon?.title || humanizeSlug(slug)),
                 mini: String(icon?.mini || ""),
                 full: String(icon?.full || ""),
-                url: normalizeIconLink(icon?.url || icon?.link || "")
+                url: normalizeIconLink(icon?.url || icon?.link || ""),
+                topSpace: normalizeIconTopSpace(icon?.topSpace ?? icon?.spaceBefore ?? icon?.offsetTop ?? icon?.offsetY ?? 0)
             };
         });
 
@@ -322,6 +334,7 @@
 
         state.data.icons.forEach((icon) => {
             icon.url = normalizeIconLink(icon.url);
+            icon.topSpace = normalizeIconTopSpace(icon.topSpace ?? icon.spaceBefore ?? icon.offsetTop ?? icon.offsetY ?? 0);
             if (iconHasLink(icon)) {
                 delete state.data.pages[icon.slug];
                 return;
@@ -564,6 +577,8 @@
         state.data.icons.forEach((icon) => {
             const link = document.createElement("a");
             link.className = "icon-link";
+            const topSpace = normalizeIconTopSpace(icon.topSpace);
+            link.style.marginTop = topSpace > 0 ? `${topSpace}px` : "";
             const targetUrl = normalizeIconLink(icon.url);
             link.href = targetUrl || `page.html#${icon.slug}`;
             link.title = icon.title;
