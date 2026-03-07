@@ -1,7 +1,7 @@
 ﻿(() => {
     const LEGACY_LOCAL_DATA_KEY = "JJS_SKILLBUILDER_DATA";
     const LANG_STORAGE_KEY = "JJS_LANG";
-    const DEFAULT_BACKEND_URL = "https://jjs-skillbuilder-backend.onrender.com";
+    const DEFAULT_BACKEND_URL = "https://jjs-skillbuilder-editor-backend.onrender.com";
 
     const DEFAULT_CANVAS_WIDTH = 1200;
     const DEFAULT_CANVAS_HEIGHT = 420;
