@@ -4,6 +4,7 @@
     const EDITOR_TOKEN_STORAGE_KEY = "JJS_EDITOR_TOKEN";
     const LANG_STORAGE_KEY = "JJS_LANG";
     const DEFAULT_BACKEND_URL = "https://jjs-skillbuilder-backend.onrender.com";
+    const ENABLE_EDITOR = false;
     const DOUBLE_F9_MS = 700;
     const MAX_VIDEO_FILE_BYTES = 200 * 1024 * 1024;
     const DEFAULT_CANVAS_WIDTH = 1200;
@@ -2420,7 +2421,7 @@
     };
 
     const initHotkey = () => {
-        if (!isIndexPage()) {
+        if (!ENABLE_EDITOR || !isIndexPage()) {
             return;
         }
 
@@ -2504,7 +2505,9 @@
             });
         }
 
-        initHotkey();
+        if (ENABLE_EDITOR) {
+            initHotkey();
+        }
         connectLiveStream();
         initLangSwitch();
     };
