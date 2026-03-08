@@ -150,12 +150,29 @@
         return result;
     };
 
+    const normalizeScrollerItems = (value) => {
+        if (Array.isArray(value)) {
+            return value
+                .map((item) => String(item || "").trim())
+                .filter(Boolean);
+        }
+
+        if (typeof value === "string") {
+            return value
+                .split(/\r?\n/g)
+                .map((item) => item.trim())
+                .filter(Boolean);
+        }
+
+        return [];
+    };
+
     const normalizeElement = (element, index) => {
         const rawType = String(element?.type || "");
-        const type = rawType === "image" || rawType === "video" ? rawType : "text";
+        const type = rawType === "image" || rawType === "video" || rawType === "scroller" ? rawType : "text";
         const radiusRaw = Number(element?.radius ?? 8);
-        const defaultW = type === "image" ? 240 : type === "video" ? 360 : 260;
-        const defaultH = type === "image" ? 150 : type === "video" ? 202 : 90;
+        const defaultW = type === "image" ? 240 : type === "video" ? 360 : type === "scroller" ? 360 : 260;
+        const defaultH = type === "image" ? 150 : type === "video" ? 202 : type === "scroller" ? 360 : 90;
 
         return {
             id: String(element?.id || `el-${index + 1}`),
@@ -170,7 +187,8 @@
             color: String(element?.color ?? "#ffffff"),
             background: String(element?.background ?? "transparent"),
             fontSize: Math.max(10, Number(element?.fontSize ?? 20)),
-            src: String(element?.src ?? "")
+            src: String(element?.src ?? ""),
+            items: normalizeScrollerItems(element?.items ?? element?.images ?? element?.screenshots)
         };
     };
 
@@ -468,6 +486,34 @@
                 video.preload = "metadata";
                 video.playsInline = true;
                 node.appendChild(video);
+            } else if (element.type === "scroller") {
+                node.style.setProperty("--scroller-gap", `${Math.max(4, 8 * scale)}px`);
+                node.style.setProperty("--scroller-pad", `${Math.max(4, 8 * scale)}px`);
+
+                const track = document.createElement("div");
+                track.className = "free-scroller-track";
+
+                const items = Array.isArray(element.items) ? element.items : [];
+                if (items.length === 0) {
+                    const empty = document.createElement("div");
+                    empty.className = "free-scroller-empty";
+                    empty.textContent = "No screenshots";
+                    track.appendChild(empty);
+                } else {
+                    items.forEach((src, itemIndex) => {
+                        const shot = document.createElement("div");
+                        shot.className = "free-scroller-shot";
+
+                        const image = document.createElement("img");
+                        image.src = src || "";
+                        image.alt = `Screenshot ${itemIndex + 1}`;
+
+                        shot.appendChild(image);
+                        track.appendChild(shot);
+                    });
+                }
+
+                node.appendChild(track);
             } else {
                 node.textContent = getElementText(element);
                 node.style.color = element.color;
