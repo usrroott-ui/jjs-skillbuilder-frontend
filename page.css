@@ -113,8 +113,8 @@ body {
 }
 
 .page-card {
-    width: min(100%, 1180px);
-    max-width: 1180px;
+    width: 100%;
+    max-width: 1480px;
     margin: 0 auto;
     border: 1px solid var(--stroke);
     border-radius: 14px;
@@ -166,6 +166,7 @@ body {
     border: 1px solid #353535;
     border-radius: 12px;
     background: #1f1f1f;
+    padding: clamp(8px, 1vw, 16px);
     overflow: hidden;
     max-width: 100%;
     -webkit-overflow-scrolling: touch;

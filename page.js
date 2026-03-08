@@ -7,6 +7,7 @@
     const DEFAULT_CANVAS_HEIGHT = 420;
     const DEFAULT_PAGE_BOUNDARY_WIDTH = 1200;
     const DEFAULT_PAGE_BOUNDARY_HEIGHT = 420;
+    const MAX_CANVAS_SCALE = 1.45;
 
     const DEFAULT_ICONS = [
         { slug: "wait", title: "Wait", mini: "minskillbuilderimg/minwait.png", full: "skillbulderimg/wait.png" },
@@ -422,7 +423,7 @@
             return 1;
         }
 
-        return clamp(Number((availableWidth / page.canvas.width).toFixed(4)), 0.1, 1);
+        return clamp(Number((availableWidth / page.canvas.width).toFixed(4)), 0.1, MAX_CANVAS_SCALE);
     };
 
     const applyCanvasFrame = (container, page) => {
