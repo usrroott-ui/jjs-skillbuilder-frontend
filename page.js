@@ -645,8 +645,6 @@
             const img = document.createElement("img");
             img.src = icon.mini;
             img.alt = icon.title;
-            img.dataset.mini = icon.mini;
-            img.dataset.full = icon.full;
 
             link.appendChild(img);
             state.refs.index.iconList.appendChild(link);
