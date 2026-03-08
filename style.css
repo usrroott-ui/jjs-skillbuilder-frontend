@@ -3,9 +3,9 @@
 :root {
     --swap-duration: 260ms;
     --swap-ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --mini-width: 30px;
+    --mini-width: 34px;
     --header-h: 52px;
-    --panel-mini-w: 56px;
+    --panel-mini-w: 62px;
     --panel-full-w: 164px;
     --panel-w: var(--panel-mini-w);
     --gap: 10px;
@@ -151,11 +151,51 @@ body.icons-expanded {
     font-size: 11px;
     letter-spacing: 0.08em;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
 }
 
 .icon-panel-toggle:focus-visible {
     outline: 2px solid #ffffff;
     outline-offset: 2px;
+}
+
+.icon-panel-toggle-glyph {
+    width: 16px;
+    height: 12px;
+    border: 1.5px solid #f2f2f2;
+    border-radius: 4px;
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.icon-panel-toggle-glyph::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 1px;
+    bottom: 1px;
+    width: 1.5px;
+    background: #f2f2f2;
+    opacity: 0.95;
+}
+
+.icon-panel-toggle-glyph::after {
+    content: "";
+    position: absolute;
+    left: 1px;
+    top: 1px;
+    bottom: 1px;
+    width: 4px;
+    border-radius: 2px;
+    background: #f2f2f2;
+    opacity: 0.35;
+}
+
+.icon-panel-toggle-label {
+    line-height: 1;
 }
 
 .icon-list {
@@ -203,8 +243,8 @@ body.icons-expanded {
 
 .icon-list img {
     display: block;
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     cursor: pointer;
     transition: width 160ms ease, height 160ms ease;
 }
@@ -463,8 +503,8 @@ body.icons-expanded .icon-list img {
     }
 
     .icon-list img {
-        width: 28px;
-        height: 28px;
+        width: 32px;
+        height: 32px;
     }
 
     .split-inner {

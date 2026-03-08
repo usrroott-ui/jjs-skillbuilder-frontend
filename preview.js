@@ -3,6 +3,7 @@
     const body = document.body;
     const iconPanel = document.getElementById("iconPanel");
     const toggle = document.getElementById("iconPanelToggle");
+    const toggleLabel = toggle?.querySelector("[data-toggle-label]") || null;
     const iconList = document.getElementById("iconList");
 
     if (!body || !iconPanel || !toggle || !iconList) {
@@ -28,7 +29,12 @@
     const applyMode = (mode) => {
         const isFull = mode === "full";
         body.classList.toggle("icons-expanded", isFull);
-        toggle.textContent = isFull ? "MINI" : "FULL";
+        if (toggleLabel) {
+            toggleLabel.textContent = isFull ? "MINI" : "FULL";
+        } else {
+            toggle.textContent = isFull ? "MINI" : "FULL";
+        }
+        toggle.setAttribute("aria-label", isFull ? "Show mini icons" : "Show full icons");
         toggle.setAttribute("aria-pressed", String(isFull));
 
         iconList.querySelectorAll("img").forEach((image) => {

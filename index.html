@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JJS Skillbuilder guide</title>
-    <link rel="stylesheet" href="style.css?v=20260308-3">
+    <link rel="stylesheet" href="style.css?v=20260308-5">
 </head>
 <body>
     <header>
@@ -32,12 +32,15 @@
     </div>
 
     <aside class="icon-panel" id="iconPanel">
-        <button type="button" class="icon-panel-toggle" id="iconPanelToggle" aria-pressed="false">FULL</button>
+        <button type="button" class="icon-panel-toggle" id="iconPanelToggle" aria-pressed="false" aria-label="Show full icons">
+            <span class="icon-panel-toggle-glyph" aria-hidden="true"></span>
+            <span class="icon-panel-toggle-label" data-toggle-label>FULL</span>
+        </button>
         <section class="icon-list" id="iconList"></section>
     </aside>
 
-    <script src="page.js?v=20260308-4"></script>
-    <script src="preview.js?v=20260308-4"></script>
+    <script src="page.js?v=20260308-5"></script>
+    <script src="preview.js?v=20260308-5"></script>
 </body>
 </html>
 
