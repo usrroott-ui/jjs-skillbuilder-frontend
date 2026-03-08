@@ -411,20 +411,49 @@
         });
     };
 
-    const renderElements = (container, page) => {
+    const getCanvasScale = (container, page) => {
+        if (!container || !page?.canvas?.width) {
+            return 1;
+        }
+
+        const wrap = container.parentElement;
+        const availableWidth = Math.max(0, Number(wrap?.clientWidth || container.clientWidth || page.canvas.width));
+        if (!availableWidth) {
+            return 1;
+        }
+
+        return clamp(Number((availableWidth / page.canvas.width).toFixed(4)), 0.1, 1);
+    };
+
+    const applyCanvasFrame = (container, page) => {
+        const scale = getCanvasScale(container, page);
+        const width = Math.max(1, Math.round(page.canvas.width * scale));
+        const height = Math.max(1, Math.round(page.canvas.height * scale));
+
+        container.style.maxWidth = "none";
+        container.style.width = `${width}px`;
+        container.style.height = `${height}px`;
+        container.style.background = page.canvas.background;
+        container.style.borderRadius = `${Math.max(0, Number(page.canvas.radius || 0)) * scale}px`;
+
+        return scale;
+    };
+
+    const renderElements = (container, page, scale = 1) => {
         if (!container || !page) {
             return;
         }
 
         container.innerHTML = "";
+        const scaled = (value) => Number(value || 0) * scale;
         page.elements.forEach((element) => {
             const node = document.createElement("div");
             node.className = `free-item ${element.type}`;
-            node.style.left = `${element.x}px`;
-            node.style.top = `${element.y}px`;
-            node.style.width = `${element.w}px`;
-            node.style.height = `${element.h}px`;
-            node.style.borderRadius = `${Math.max(0, Number(element.radius || 0))}px`;
+            node.style.left = `${scaled(element.x)}px`;
+            node.style.top = `${scaled(element.y)}px`;
+            node.style.width = `${scaled(element.w)}px`;
+            node.style.height = `${scaled(element.h)}px`;
+            node.style.borderRadius = `${scaled(Math.max(0, Number(element.radius || 0)))}px`;
 
             if (element.type === "image") {
                 const image = document.createElement("img");
@@ -442,7 +471,8 @@
                 node.textContent = getElementText(element);
                 node.style.color = element.color;
                 node.style.background = element.background;
-                node.style.fontSize = `${element.fontSize}px`;
+                node.style.fontSize = `${Math.max(8, scaled(element.fontSize))}px`;
+                node.style.padding = `${Math.max(2, 4 * scale)}px ${Math.max(3, 6 * scale)}px`;
             }
 
             container.appendChild(node);
@@ -469,7 +499,8 @@
 
             refs.sections.innerHTML = "";
             refs.canvas.innerHTML = "";
-            refs.canvas.style.width = `${DEFAULT_CANVAS_WIDTH}px`;
+            refs.canvas.style.width = "100%";
+            refs.canvas.style.maxWidth = `${DEFAULT_CANVAS_WIDTH}px`;
             refs.canvas.style.height = `${DEFAULT_CANVAS_HEIGHT}px`;
             refs.canvas.style.background = "#1f1f1f";
             refs.canvas.style.borderRadius = "12px";
@@ -490,11 +521,8 @@
                 refs.splitInner.style.maxWidth = fullWidth ? "none" : `${page.layout.boundaryWidth}px`;
             }
 
-            refs.canvas.style.width = `${page.canvas.width}px`;
-            refs.canvas.style.height = `${page.canvas.height}px`;
-            refs.canvas.style.background = page.canvas.background;
-            refs.canvas.style.borderRadius = `${Math.max(0, Number(page.canvas.radius || 0))}px`;
-            renderElements(refs.canvas, page);
+            const scale = applyCanvasFrame(refs.canvas, page);
+            renderElements(refs.canvas, page, scale);
         }
 
         state.indexLinks.forEach((link) => {
@@ -519,7 +547,8 @@
                 : "No content for this page.";
             refs.sections.innerHTML = "";
             refs.canvas.innerHTML = "";
-            refs.canvas.style.width = `${DEFAULT_CANVAS_WIDTH}px`;
+            refs.canvas.style.width = "100%";
+            refs.canvas.style.maxWidth = `${DEFAULT_CANVAS_WIDTH}px`;
             refs.canvas.style.height = `${DEFAULT_CANVAS_HEIGHT}px`;
             refs.canvas.style.background = "#1f1f1f";
             refs.canvas.style.borderRadius = "12px";
@@ -540,11 +569,8 @@
             refs.card.style.maxWidth = fullWidth ? "none" : `${page.layout.boundaryWidth}px`;
         }
 
-        refs.canvas.style.width = `${page.canvas.width}px`;
-        refs.canvas.style.height = `${page.canvas.height}px`;
-        refs.canvas.style.background = page.canvas.background;
-        refs.canvas.style.borderRadius = `${Math.max(0, Number(page.canvas.radius || 0))}px`;
-        renderElements(refs.canvas, page);
+        const scale = applyCanvasFrame(refs.canvas, page);
+        renderElements(refs.canvas, page, scale);
         document.title = `${getLocalizedField(page, "title") || page.title} | JJS Skillbuilder`;
     };
 
@@ -740,6 +766,14 @@
 
         initLangSwitch();
         connectLiveStream(apiBase);
+
+        let resizeFrame = 0;
+        window.addEventListener("resize", () => {
+            cancelAnimationFrame(resizeFrame);
+            resizeFrame = requestAnimationFrame(() => {
+                renderMain();
+            });
+        });
     };
 
     bootstrap();

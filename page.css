@@ -23,6 +23,7 @@ html,
 body {
     margin: 0;
     min-height: 100%;
+    min-height: 100dvh;
     overflow-x: hidden;
 }
 
@@ -40,6 +41,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .lang-switch {
@@ -111,7 +113,9 @@ body {
 }
 
 .page-card {
+    width: min(100%, 1180px);
     max-width: 1180px;
+    margin: 0 auto;
     border: 1px solid var(--stroke);
     border-radius: 14px;
     background: var(--panel);
@@ -162,16 +166,21 @@ body {
     border: 1px solid #353535;
     border-radius: 12px;
     background: #1f1f1f;
-    overflow: auto;
+    overflow: hidden;
     max-width: 100%;
     -webkit-overflow-scrolling: touch;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
 }
 
 .free-canvas {
     position: relative;
     min-height: 420px;
-    min-width: 100%;
+    min-width: 0;
     overflow: hidden;
+    flex: none;
+    max-width: 100%;
 }
 
 .free-item {
@@ -222,11 +231,21 @@ body {
 }
 
 @media (max-width: 640px) {
+    .page-header {
+        padding: 8px;
+        align-items: flex-start;
+    }
+
     .page-card {
         padding: 12px;
     }
 
     .page-section h3 {
         font-size: 17px;
+    }
+
+    .back-link {
+        width: 100%;
+        text-align: center;
     }
 }
